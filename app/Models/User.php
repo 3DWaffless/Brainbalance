@@ -1,5 +1,4 @@
 <?php
-// FILE: app/Models/User.php
 
 namespace App\Models;
 
@@ -53,29 +52,31 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+    // Dynamic relationship accessor depending on role
+    public function classes()
+    {
+        return $this->isTeacher() ? $this->ownedClasses() : $this->joinedClasses();
+    }
+
     // ---------------------------------------------------------------
     // HELPERS
     // ---------------------------------------------------------------
 
-    // Quiz attempts made by this student
     public function quizAttempts()
     {
         return $this->hasMany(QuizAttempt::class, 'student_id');
     }
 
-    // Minigame attempts made by this student
     public function minigameAttempts()
     {
         return $this->hasMany(MinigameAttempt::class, 'student_id');
     }
 
-    // Per-topic progress records for this student
     public function progress()
     {
         return $this->hasMany(StudentProgress::class, 'student_id');
     }
 
-    // Badges earned by this student
     public function badges()
     {
         return $this->belongsToMany(Badge::class, 'student_badges', 'student_id', 'badge_id')

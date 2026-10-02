@@ -1,33 +1,30 @@
 <?php
-// FILE: app/Models/Classroom.php
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 
 class Classroom extends Model
 {
+    use HasFactory;
+
     protected $table = 'classes';
 
     protected $fillable = [
         'teacher_id',
-        'name',
+        'class_name',
+        'subject',
+        'class_code',
+        'grade_level',
         'description',
-        'code',
     ];
 
-    // ---------------------------------------------------------------
-    // RELATIONSHIPS
-    // ---------------------------------------------------------------
-
-    // The teacher who owns this class
     public function teacher()
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    // All students in this class
     public function students()
     {
         return $this->belongsToMany(User::class, 'class_student', 'class_id', 'student_id')
@@ -35,17 +32,18 @@ class Classroom extends Model
                     ->withTimestamps();
     }
 
-    // ---------------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------------
-
-    // Generate a unique class code like "BB-A1X9"
-    public static function generateCode(): string
+    public function topics()
     {
-        do {
-            $code = 'BB-' . strtoupper(Str::random(4));
-        } while (self::where('code', $code)->exists());
+        return $this->hasMany(Topic::class, 'class_id');
+    }
 
-        return $code;
+    public function modules()
+    {
+        return $this->hasMany(Module::class, 'class_id');
+    }
+
+    public function quizzes()
+    {
+        return $this->hasMany(Quiz::class, 'class_id');
     }
 }

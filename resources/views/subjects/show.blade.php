@@ -4,16 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Learning Modules — {{ config('app.name', 'BrainBalance') }}</title>
+    <title><?= e($classroom->class_name) ?> — {{ config('app.name', 'BrainBalance') }}</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    
+
     <!-- Markdown Parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
+
     <!-- MathJax for LaTeX Equations -->
     <script>
         window.MathJax = {
@@ -47,29 +47,25 @@
         .sb-uname { font-size: 13px; font-weight: 900; color: #2D2D2D; line-height: 1.2; }
         .sb-urole { font-size: 10px; font-weight: 700; color: #aaa; }
         .main { margin-left: 210px; flex: 1; padding: 1.75rem; }
-        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
         .tgreet { font-weight: 900; font-size: 22px; color: #2D2D2D; }
         .tsub { font-size: 13px; color: #aaa; font-weight: 700; margin-top: 3px; }
-        .alert { padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
-        .alert-success { background: #D4EDDA; color: #155724; border: 2px solid #C3E6CB; }
-        .alert-error { background: #F8D7DA; color: #721C24; border: 2px solid #F5C6CB; }
-        .card { background: #fff; border-radius: 18px; padding: 20px; border: 2px solid #FFE4C4; margin-bottom: 1.25rem; }
-        .card-title { font-size: 15px; font-weight: 900; color: #2D2D2D; margin-bottom: 12px; }
-        .form-field { margin-bottom: 12px; }
-        .form-label { display: block; font-size: 12px; font-weight: 800; color: #555; margin-bottom: 5px; }
-        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 14px; border-radius: 12px; border: 2px solid #FFE4C4; background: #FFF8F0; color: #2D2D2D; font-size: 14px; font-family: 'Nunito', sans-serif; font-weight: 700; outline: none; }
-        .btn-primary { background: #FF6B6B; color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 900; font-family: 'Nunito', sans-serif; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-primary:hover { background: #e85555; }
-        .btn-teal { background: #4ECDC4; color: #fff; border: none; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 900; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+
+        .back-link { color: #FF6B6B; font-weight: 900; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; font-size: 13px; }
+        .back-link:hover { text-decoration: underline; }
+        .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #fff; border-radius: 18px; padding: 20px; border: 2px solid #FFE4C4; }
+        .card-title { font-size: 15px; font-weight: 900; color: #2D2D2D; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .item-list { display: flex; flex-direction: column; gap: 10px; }
+        .item { padding: 12px 14px; background: #FFF8F0; border-radius: 14px; border: 2px solid #FFE4C4; display: flex; justify-content: space-between; align-items: center; }
+        .item-title { font-weight: 900; font-size: 14px; color: #2D2D2D; }
+        .item-sub { font-size: 11px; font-weight: 700; color: #aaa; margin-top: 2px; }
+        .btn-teal { background: #4ECDC4; color: #fff; border: none; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 900; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
         .btn-teal:hover { background: #3ab8b0; }
-        .btn-ghost { background: #fff; color: #FF6B6B; border: 2px solid #FFE4C4; padding: 7px 12px; border-radius: 10px; font-size: 12px; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-ghost { background: #fff; color: #FF6B6B; border: 2px solid #FFE4C4; padding: 7px 12px; border-radius: 10px; font-size: 12px; font-weight: 900; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
         .btn-ghost:hover { background: #FFF0E0; }
-        .btn-danger { background: transparent; color: #e74c3c; border: 2px solid #F8D7DA; padding: 6px 12px; border-radius: 10px; font-size: 11px; font-weight: 900; cursor: pointer; }
-        .btn-danger:hover { background: #F8D7DA; }
-        .module-grid { display: grid; grid-template-columns: {{ Auth::user()->isTeacher() ? '1fr 1.5fr' : '1fr' }}; gap: 20px; }
-        .module-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #FFF8F0; border-radius: 14px; border: 2px solid #FFE4C4; margin-bottom: 10px; }
-        .module-title { font-size: 14px; font-weight: 900; color: #2D2D2D; }
-        .module-sub { font-size: 11px; font-weight: 700; color: #aaa; margin-top: 2px; }
+        .btn-pink { background: #FF6B6B; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 900; }
+        .btn-pink:hover { background: #e85555; }
 
         /* VIEW MODAL & AI CHAT OVERLAY */
         .viewer-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
@@ -121,20 +117,20 @@
             Dashboard
         </a>
         <div class="sb-section">Learn</div>
-        <a href="{{ route('subjects.index') }}" class="sb-item {{ request()->routeIs('subjects.*') ? 'active' : '' }}">
+        <a href="{{ route('subjects.index') }}" class="sb-item active">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             Subjects
         </a>
-        <a href="{{ route('modules.index') }}" class="sb-item {{ request()->routeIs('modules.*') ? 'active' : '' }}">
+        <a href="{{ route('modules.index') }}" class="sb-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             Learning Modules
         </a>
-        <a href="{{ Auth::user()->isTeacher() ? route('quiz.results') : route('quiz.index') }}" class="sb-item {{ request()->routeIs('quiz.*') ? 'active' : '' }}">
+        <a href="{{ Auth::user()->isTeacher() ? route('quiz.results') : route('quiz.index') }}" class="sb-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             Quizzes
         </a>
         <div class="sb-section">Account</div>
-        <a href="{{ route('profile.edit') }}" class="sb-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+        <a href="{{ route('profile.edit') }}" class="sb-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Settings
         </a>
@@ -160,142 +156,63 @@
 
 {{-- MAIN --}}
 <div class="main">
+    <a href="<?= route('subjects.index') ?>" class="back-link">← Back to Subjects</a>
+    
     <div class="topbar">
         <div>
-            <div class="tgreet">Learning Modules 📚</div>
-            <div class="tsub">
-                @if(Auth::user()->isTeacher())
-                    Upload and manage course resources for your students.
-                @else
-                    Read and view educational materials with your AI Assistant!
-                @endif
-            </div>
+            <div class="tgreet"><?= e($classroom->class_name) ?></div>
+            <div class="tsub"><?= e($classroom->subject ?? 'General Subject') ?> &bull; Code: <?= e($classroom->class_code ?? 'N/A') ?></div>
         </div>
     </div>
 
-    @if(session('status') === 'module-uploaded')
-        <div class="alert alert-success">✅ Module uploaded successfully!</div>
-    @elseif(session('status') === 'module-deleted')
-        <div class="alert alert-error">🗑 Module deleted successfully.</div>
-    @elseif(session('success'))
-        <div class="alert alert-success">✅ {{ session('success') }}</div>
-    @elseif(session('error'))
-        <div class="alert alert-error">❌ {{ session('error') }}</div>
-    @endif
-
-    <div class="module-grid">
-        {{-- TEACHER-ONLY FORMS --}}
-        @if(Auth::user()->isTeacher())
-        <div>
-            {{-- UPLOAD MODULE CARD --}}
-            <div class="card">
-                <div class="card-title">Upload Module 📤</div>
-                <form action="{{ route('modules.store') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="form-field">
-                        <label class="form-label">Title *</label>
-                        <input type="text" name="title" value="{{ old('title') }}" required class="form-input">
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Topic (Optional)</label>
-                        <select name="topic_id" class="form-select">
-                            <option value="">-- Select Topic --</option>
-                            <?php foreach($topics as$topic): ?>
-                                <option value="{{ $topic->id }}">{{ $topic->name ?? $topic->title }}</option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Description</label>
-                        <textarea name="description" rows="3" class="form-textarea">{{ old('description') }}</textarea>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Document File (PDF, DOCX, PPTX, ZIP)</label>
-                        <input type="file" name="module_file" required style="font-size:12px">
-                    </div>
-
-                    <button type="submit" class="btn-primary" style="width:100%;justify-content:center;margin-top:6px">
-                        Upload Resource
-                    </button>
-                </form>
-            </div>
-
-            {{-- GENERATE AI QUIZ CARD --}}
-            <div class="card">
-                <div class="card-title">Generate AI Quiz 🤖</div>
-                <form action="{{ route('quiz.generateFromPdf') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    
-                    <div class="form-field">
-                        <label class="form-label">Assign to Class *</label>
-                        <select name="class_id" required class="form-select">
-                            <option value="">-- Select Class --</option>
-                            <?php foreach(Auth::user()->ownedClasses as $class): ?>
-                                <option value="{{ $class->id }}">{{ $class->class_name }} ({{$class->subject }})</option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Subject *</label>
-                        <select name="subject" required class="form-select">
-                            <option value="math">Mathematics</option>
-                            <option value="english">English</option>
-                        </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Lesson PDF *</label>
-                        <input type="file" name="pdf_file" accept=".pdf" required style="font-size:12px">
-                    </div>
-
-                    <button type="submit" class="btn-teal" style="width:100%;justify-content:center;margin-top:6px;padding:10px 20px">
-                        ✨ Generate Quiz with Gemini
-                    </button>
-                </form>
+    <div class="content-grid">
+        <!-- FILES & LEARNING MODULES -->
+        <div class="card">
+            <div class="card-title">📄 Class Files & Learning Modules</div>
+            <div class="item-list">
+                <?php if (count($modules) === 0): ?>
+                    <p style="font-size:13px; color:#aaa; font-weight:700;">No learning modules uploaded yet for this class.</p>
+                <?php else: ?>
+                    <?php foreach ($modules as$module): ?>
+                        <div class="item">
+                            <div>
+                                <div class="item-title"><?= e($module->title) ?></div>
+                                <div class="item-sub">
+                                    <?= strtoupper($module->file_type ?? 'FILE') ?> &bull; <?= $module->file_size ?? 0 ?> KB
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <button onclick="openViewer('<?= route('modules.view', $module->id) ?>', '<?= addslashes($module->title) ?>', <?=$module->id ?>)" class="btn-teal">
+                                    👁 View
+                                </button>
+                                <a href="<?= route('modules.download', $module->id) ?>" class="btn-ghost">
+                                    ⬇ Download
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
-        @endif
 
-        {{-- AVAILABLE MODULES (VISIBLE TO ALL) --}}
+        <!-- TEACHER QUIZZES -->
         <div class="card">
-            <div class="card-title">Available Resources 📖</div>
-            <?php if(count($modules) === 0): ?>
-                <p style="font-size:13px;color:#aaa;font-weight:700">No learning modules uploaded yet.</p>
-            <?php else: ?>
-                <?php foreach($modules as$module): ?>
-                    <div class="module-item">
-                        <div>
-                            <div class="module-title">{{ $module->title }}</div>
-                            <div class="module-sub">
-                                {{ strtoupper($module->file_type) }} &bull; {{ $module->file_size }} KB &bull; {{$module->created_at->format('M d, Y') }}
+            <div class="card-title">📝 Class Quizzes</div>
+            <div class="item-list">
+                <?php if (count($quizzes) === 0): ?>
+                    <p style="font-size:13px; color:#aaa; font-weight:700;">No quizzes created yet for this class.</p>
+                <?php else: ?>
+                    <?php foreach ($quizzes as$quiz): ?>
+                        <div class="item">
+                            <div>
+                                <div class="item-title"><?= e($quiz->title) ?></div>
+                                <div class="item-sub"><?= e(ucfirst($quiz->subject ?? 'General')) ?></div>
                             </div>
-                            @if($module->description)
-                                <p style="font-size:12px;color:#666;margin-top:4px">{{ $module->description }}</p>
-                            @endif
+                            <a href="<?= route('quiz.show', $quiz->id) ?>" class="btn-pink">Start Quiz</a>
                         </div>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <button onclick="openViewer('{{ route('modules.view', $module) }}', '{{ addslashes($module->title) }}', {{$module->id }})" class="btn-teal">
-                                👁 View
-                            </button>
-
-                            <a href="{{ route('modules.download', $module) }}" class="btn-ghost">
-                                ⬇ Download
-                            </a>
-
-                            @if(Auth::user()->isTeacher())
-                                <form action="{{ route('modules.destroy', $module) }}" method="POST" onsubmit="return confirm('Delete this module?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn-danger">Delete</button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
@@ -389,5 +306,5 @@
     }
 </script>
 
-</body> 
+</body>
 </html>

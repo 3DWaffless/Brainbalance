@@ -7,6 +7,7 @@ use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\SubjectController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -26,6 +27,10 @@ Route::get('/terms', fn() => view('terms'))->name('terms');
 Route::get('/privacy', fn() => view('privacy'))->name('privacy');
 
 Route::middleware('auth')->group(function () {
+    // Subject & Class Workspace Routes
+    Route::get('/subjects', [SubjectController::class, 'index'])->name('subjects.index');
+    Route::get('/subjects/class/{classroom}', [SubjectController::class, 'show'])->name('subjects.show');
+
     // Classroom Routes
     Route::get('/dashboard', [ClassroomController::class, 'dashboard'])->name('dashboard');
     Route::post('/classes', [ClassroomController::class, 'store'])->name('classes.store');
@@ -34,11 +39,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/classes/join', [ClassroomController::class, 'join'])->name('classes.join');
     Route::delete('/classes/{classroom}/leave', [ClassroomController::class, 'leave'])->name('classes.leave');
 
-    // Quiz Routes
+    // Quiz Routes (Static literal routes defined BEFORE parameterized wildcards)
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz.index');
+    Route::get('/quiz/results', [QuizController::class, 'results'])->name('quiz.results');
+    Route::get('/quiz/{quiz}', [QuizController::class, 'show'])->name('quiz.show');
     Route::post('/quiz/start', [QuizController::class, 'start'])->name('quiz.start');
     Route::post('/quiz/answer', [QuizController::class, 'submitAnswer'])->name('quiz.answer');
-    Route::get('/quiz/results', [QuizController::class, 'results'])->name('quiz.results');
+    Route::post('/quiz/generate-pdf', [QuizController::class, 'generateFromPdf'])->name('quiz.generateFromPdf');
 
     // Module Routes
     Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');

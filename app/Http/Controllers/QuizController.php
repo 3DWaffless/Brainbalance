@@ -7,19 +7,21 @@ use App\Models\QuestionResponse;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Topic;
-use App\Services\AnthropicService;
+use App\Models\Classroom;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Smalot\PdfParser\Parser as PdfParser;
 
 class QuizController extends Controller
 {
-    protected ?AnthropicService $ai = null;
+    protected ?GeminiService $ai = null;
 
     public function __construct()
     {
         try {
-            $this->ai = app(AnthropicService::class);
+            $this->ai = app(GeminiService::class);
         } catch (\Throwable $e) {
             // No API key configured yet — the quiz will fall back to the static question bank.
             $this->ai = null;
@@ -27,18 +29,42 @@ class QuizController extends Controller
     }
 
     /**
-     * Show the subject picker (start screen) — for students.
+     * Show all quizzes available to the user or quiz creation hub.
      */
     public function index()
     {
-        abort_unless(Auth::user()->isStudent(), 403);
+        $user = Auth::user();
 
-        if (Auth::user()->joinedClasses()->count() === 0) {
+        if ($user->isTeacher()) {
+            $classes = $user->ownedClasses;
+            $quizzes = Quiz::whereIn('class_id', $classes->pluck('id'))->latest()->get();
+            return view('quiz.index', compact('classes', 'quizzes'));
+        }
+
+        if ($user->joinedClasses()->count() === 0) {
             return redirect()->route('dashboard')
                 ->with('error', 'You need to join a class before you can take a quiz.');
         }
 
-        return view('quiz.play');
+        $quizzes = Quiz::whereIn('class_id', $user->joinedClasses->pluck('id'))->latest()->get();
+        return view('quiz.play', compact('quizzes'));
+    }
+
+    /**
+     * Display a specific class quiz for a student to attempt.
+     */
+    public function show(Quiz $quiz)
+    {
+        $user = Auth::user();
+
+        // Security check: Ensure student belongs to the class
+        if ($user->isStudent() && !$user->joinedClasses->contains($quiz->class_id)) {
+            abort(403, 'You are not enrolled in the class for this quiz.');
+        }
+
+        $quiz->load('questions');
+
+        return view('quiz.show', compact('quiz'));
     }
 
     /**
@@ -59,8 +85,80 @@ class QuizController extends Controller
     }
 
     /**
+     * Upload PDF and generate an AI-driven Quiz assigned to a class using Gemini AI (TEACHERS ONLY).
+     */
+    public function generateFromPdf(Request $request)
+    {
+        abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized. Only teachers can create quizzes from PDF modules.');
+
+        $request->validate([
+            'class_id' => 'required|exists:classes,id',
+            'pdf_file' => 'required|mimes:pdf|max:10240', // 10MB limit
+            'subject'  => 'required|in:math,english',
+            'topic_id' => 'nullable|exists:topics,id',
+        ]);
+
+        $file = $request->file('pdf_file');
+        
+        try {
+            $parser = new PdfParser();
+            $pdf = $parser->parseFile($file->getPathname());
+            $extractedText = substr($pdf->getText(), 0, 4000); // Context length limit
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Failed to extract text from the PDF file.');
+        }
+
+        if (empty(trim($extractedText))) {
+            return back()->with('error', 'Could not read text from the uploaded PDF.');
+        }
+
+        if (!$this->ai) {
+            return back()->with('error', 'Gemini AI service is not configured.');
+        }
+
+        // Generate Questions via Gemini Service
+        $questions = $this->ai->generateQuizFromText(
+            $extractedText,
+            ucfirst($request->input('subject')),
+            'Grade 3',
+            5
+        );
+
+        if (empty($questions)) {
+            return back()->with('error', 'Failed to generate quiz questions using Gemini AI.');
+        }
+
+        $topic = $this->topicForSubject($request->input('subject'));
+
+        $quiz = Quiz::create([
+            'class_id' => $request->input('class_id'),
+            'topic_id' => $request->input('topic_id') ?? $topic->id,
+            'type'     => 'ai_generated',
+            'title'    => 'Gemini AI Quiz: ' . pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+            'subject'  => $request->input('subject'),
+            'config'   => ['source' => $file->getClientOriginalName()]
+        ]);
+
+        foreach ($questions as $q) {
+            $questionModel = Question::create([
+                'topic_id'         => $quiz->topic_id,
+                'question_text'    => $q['question_text'],
+                'question_type'    => 'multiple_choice',
+                'difficulty_level' => strtolower($q['difficulty_level'] ?? 'easy'),
+                'correct_answer'   => $q['correct_answer'],
+                'options'          => $q['options']
+            ]);
+
+            $quiz->questions()->syncWithoutDetaching([$questionModel->id]);
+        }
+
+        return redirect()->route('subjects.show', $request->input('class_id'))
+                         ->with('success', 'Gemini AI Quiz generated successfully!');
+    }
+
+    /**
      * Find (or create) the Topic row that represents a subject's AI-driven
-     * adaptive quiz track, so generated content has a real topic_id to hang off.
+     * adaptive quiz track.
      */
     protected function topicForSubject(string $subject): Topic
     {
@@ -71,8 +169,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Find (or create) the Quiz row representing the AI-generated adaptive
-     * quiz for a subject.
+     * Find (or create) the Quiz row representing the AI-generated adaptive quiz.
      */
     protected function quizForSubject(string $subject, Topic $topic): Quiz
     {
@@ -83,7 +180,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Start a new session: pick subject, reset in-memory progress, get Q1.
+     * Start a new interactive session: pick subject, reset in-memory progress, get Q1.
      */
     public function start(Request $request)
     {
@@ -131,8 +228,8 @@ class QuizController extends Controller
     }
 
     /**
-     * Submit an answer for the current question, evaluate gamification (streaks/XP/time),
-     * and get next question (or finish attempt).
+     * Submit an answer for the current question, evaluate gamification stats,
+     * and proceed or finish attempt.
      */
     public function submitAnswer(Request $request)
     {
@@ -166,21 +263,18 @@ class QuizController extends Controller
                 $progress['max_streak'] = $progress['current_streak'];
             }
 
-            // Streak Multipliers
             if ($progress['current_streak'] >= 5) {
                 $multiplier = 2.0;
             } elseif ($progress['current_streak'] >= 3) {
                 $multiplier = 1.5;
             }
 
-            // Speed Bonus (15s standard timer)
             $timeBonus = max(0, (15 - $timeTaken) * 5);
             $earnedXp = (int) round(($baseXp + $timeBonus) * $multiplier);
             $progress['total_xp'] = ($progress['total_xp'] ?? 0) + $earnedXp;
 
             $progress['level'] = $this->stepUp($progress['level']);
         } else {
-            // Reset streak on incorrect answer or timeout
             $progress['current_streak'] = 0;
             $progress['level'] = $this->stepDown($progress['level']);
         }
@@ -208,7 +302,6 @@ class QuizController extends Controller
             $startedAt = isset($progress['started_at']) ? \Carbon\Carbon::parse($progress['started_at']) : now();
             $totalTimeTaken = (int) round(abs($startedAt->diffInSeconds(now())));
 
-            // Save Attempt with Gamification stats
             $attempt = QuizAttempt::create([
                 'student_id'         => Auth::id(),
                 'quiz_id'            => $quiz->id,
@@ -221,16 +314,13 @@ class QuizController extends Controller
                 'total_xp'           => $progress['total_xp'],
             ]);
 
-            // Update Student Global XP and Level on User model
             $user = Auth::user();
             if ($user) {
                 $user->total_xp = ($user->total_xp ?? 0) + $progress['total_xp'];
-                // Level up formula: Level increases every 1,000 XP
                 $user->level = (int) floor($user->total_xp / 1000) + 1;
                 $user->save();
             }
 
-            // Save Question Responses
             foreach ($progress['log'] as $entry) {
                 $options = $entry['options'] ?? null;
                 $correctAnswer = ($options && isset($entry['correct_index']))
@@ -303,21 +393,18 @@ class QuizController extends Controller
     }
 
     /**
-     * Pull one question from the static question bank (falling back to
-     * live Claude generation if configured, then to a hardcoded default).
+     * Pull one question from the static question bank.
      */
     protected function generateQuestion(string $subject, string $level, array $excludeIds = []): array
     {
         $topic = $this->topicForSubject($subject);
 
-        // 1) Try the static question bank for this subject + difficulty level.
         $query = Question::where('topic_id', $topic->id)->where('difficulty_level', $level);
         if (!empty($excludeIds)) {
             $query->whereNotIn('id', $excludeIds);
         }
         $question = $query->inRandomOrder()->first();
 
-        // 2) If that level's pool is exhausted, try any difficulty for this subject.
         if (!$question) {
             $query = Question::where('topic_id', $topic->id);
             if (!empty($excludeIds)) {
@@ -338,32 +425,37 @@ class QuizController extends Controller
             ];
         }
 
-        // 3) If the bank has nothing left and Claude is configured, generate one live.
         if ($this->ai) {
             $subjectLabel = $subject === 'math' ? 'elementary Math' : 'elementary English';
 
-            $system = "You are a quiz generator for elementary school students (grades 1-6). "
-                . "Generate exactly one multiple-choice {$subjectLabel} question at {$level} difficulty. "
-                . "Return JSON with keys: text (string), options (array of exactly 4 short strings), correct_index (integer 0-3). "
-                . "Keep language simple and age-appropriate. Do not repeat common example questions.";
-
-            $user = "Generate one {$level}-difficulty {$subjectLabel} multiple-choice question.";
+            $userPrompt = "Generate one {$level}-difficulty {$subjectLabel} multiple-choice question.\n" .
+                "Return ONLY a JSON object with this exact structure:\n" .
+                "{\n" .
+                "  \"text\": \"Question string\",\n" .
+                "  \"options\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n" .
+                "  \"correct_index\": 1\n" .
+                "}";
 
             try {
-                $data = $this->ai->askJson($system, $user, 400);
+                $questions = $this->ai->generateQuizFromText($userPrompt, ucfirst($subject), 'Grade 3', 1);
 
-                return [
-                    'id'            => null,
-                    'text'          => $data['text'] ?? 'What is 2 + 2?',
-                    'options'       => $data['options'] ?? ['3', '4', '5', '6'],
-                    'correct_index' => $data['correct_index'] ?? 1,
-                ];
+                if (!empty($questions[0])) {
+                    $item = $questions[0];
+                    $options = $item['options'] ?? ['3', '4', '5', '6'];
+                    $correctIndex = array_search($item['correct_answer'] ?? '', $options, true);
+
+                    return [
+                        'id'            => null,
+                        'text'          => $item['question_text'] ?? 'What is 2 + 2?',
+                        'options'       => $options,
+                        'correct_index' => $correctIndex !== false ? $correctIndex : 1,
+                    ];
+                }
             } catch (\Throwable $e) {
-                // fall through to hardcoded fallback below
+                logger()->error('Gemini live question generation failed: ' . $e->getMessage());
             }
         }
 
-        // 4) Last-resort hardcoded fallback so the quiz flow never breaks.
         return [
             'id'            => null,
             'text'          => 'What is 2 + 2?',
