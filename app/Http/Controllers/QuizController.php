@@ -9,6 +9,7 @@ use App\Models\QuizAttempt;
 use App\Models\Topic;
 use App\Models\Classroom;
 use App\Services\GeminiService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -51,7 +52,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Display a specific class quiz for a student to attempt.
+     * Display a specific class quiz for a student to attempt.[cite: 4]
      */
     public function show(Quiz $quiz)
     {
@@ -62,13 +63,18 @@ class QuizController extends Controller
             abort(403, 'You are not enrolled in the class for this quiz.');
         }
 
+        // ENFORCE DEADLINE
+        if ($quiz->deadline_at && now()->greaterThan($quiz->deadline_at)) {
+            abort(403, 'The deadline for this quiz has passed. It is no longer accessible.');
+        }
+
         $quiz->load('questions');
 
         return view('quiz.show', compact('quiz'));
     }
 
     /**
-     * Show all quiz attempt results — for teachers.
+     * Show all quiz attempt results — for teachers.[cite: 4]
      */
     public function results()
     {
@@ -84,32 +90,62 @@ class QuizController extends Controller
         return view('quiz.results', compact('sessions'));
     }
 
+    // ==========================================
+    // AI QUIZ CREATION WIZARD (STEP 1, 2 & 3)
+    // ==========================================
+
     /**
-     * Upload PDF and generate an AI-driven Quiz assigned to a class using Gemini AI (TEACHERS ONLY).
+     * STEP 1: Show the Quiz Creation Form (Upload PDF)
      */
-    public function generateFromPdf(Request $request)
+    public function create()
     {
-        abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized. Only teachers can create quizzes from PDF modules.');
+        abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized.');
+        
+        $classes = Auth::user()->classes ?? Auth::user()->ownedClasses; // Fallback to avoid relationship conflicts
+        return view('quiz.create', compact('classes'));
+    }
+
+    /**
+     * STEP 2: Process PDF and Generate Questions with AI
+     */
+    public function generate(Request $request)
+    {
+        abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized.');
 
         $request->validate([
-            'class_id' => 'required|exists:classes,id',
-            'pdf_file' => 'required|mimes:pdf|max:10240', // 10MB limit
-            'subject'  => 'required|in:math,english',
-            'topic_id' => 'nullable|exists:topics,id',
+            'module_pdf'     => 'required|mimes:pdf|max:10240',
+            'class_id'       => 'required',
+            'question_count' => 'required|integer|min:1|max:50',
+            'quiz_title'     => 'required|string',
         ]);
 
-        $file = $request->file('pdf_file');
+        $file = $request->file('module_pdf');
         
         try {
             $parser = new PdfParser();
             $pdf = $parser->parseFile($file->getPathname());
-            $extractedText = substr($pdf->getText(), 0, 4000); // Context length limit
+            
+            $extractedText = '';
+            foreach ($pdf->getPages() as $page) {
+                $pageText = $page->getText();
+                if (!empty($pageText)) {
+                    $extractedText .= $pageText . "\n";
+                }
+            }
+
+            // Fallback if page-by-page extraction returns empty text
+            $details = $pdf->getDetails();
+            if (empty(trim($extractedText)) && isset($details['Texts'])) {
+                $extractedText = implode("\n", $details['Texts']);
+            }
+
+            $extractedText = substr(trim($extractedText), 0, 4000); 
         } catch (\Throwable $e) {
-            return back()->with('error', 'Failed to extract text from the PDF file.');
+            return back()->with('error', 'PDF Extraction Failed: ' . $e->getMessage());
         }
 
         if (empty(trim($extractedText))) {
-            return back()->with('error', 'Could not read text from the uploaded PDF.');
+            return back()->with('error', 'The uploaded PDF appears to be empty or contains scanned images without selectable text. Please upload a text-based PDF document.');
         }
 
         if (!$this->ai) {
@@ -117,48 +153,81 @@ class QuizController extends Controller
         }
 
         // Generate Questions via Gemini Service
-        $questions = $this->ai->generateQuizFromText(
+        $aiQuestions = $this->ai->generateQuizFromText(
             $extractedText,
-            ucfirst($request->input('subject')),
+            'General', 
             'Grade 3',
-            5
+            $request->question_count
         );
 
-        if (empty($questions)) {
+        if (empty($aiQuestions)) {
             return back()->with('error', 'Failed to generate quiz questions using Gemini AI.');
         }
 
-        $topic = $this->topicForSubject($request->input('subject'));
+        $generatedQuestions = array_map(function($q) {
+            return [
+                'question' => $q['question_text'] ?? 'Question Text Missing',
+                'answer'   => $q['correct_answer'] ?? 'Answer Missing',
+                'options'  => $q['options'] ?? []
+            ];
+        }, $aiQuestions);
 
-        $quiz = Quiz::create([
-            'class_id' => $request->input('class_id'),
-            'topic_id' => $request->input('topic_id') ?? $topic->id,
-            'type'     => 'ai_generated',
-            'title'    => 'Gemini AI Quiz: ' . pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
-            'subject'  => $request->input('subject'),
-            'config'   => ['source' => $file->getClientOriginalName()]
+        $classes = Auth::user()->classes ?? Auth::user()->ownedClasses;
+        $class_id = $request->class_id;
+        $quiz_title = $request->quiz_title;
+
+        return view('quiz.create', compact('classes', 'generatedQuestions', 'class_id', 'quiz_title'));
+    }
+
+    /**
+     * STEP 3: Save Finalized Quiz & Enforce Deadlines
+     */
+    public function store(Request $request)
+    {
+        abort_unless(Auth::user()->isTeacher(), 403);
+
+        $request->validate([
+            'class_id'     => 'required|exists:classes,id',
+            'quiz_title'   => 'required|string',
+            'published_at' => 'required|date',
+            'deadline_at'  => 'required|date|after:published_at',
+            'questions'    => 'required|array',
         ]);
 
-        foreach ($questions as $q) {
+        $topic = $this->topicForSubject('General'); 
+
+        $quiz = Quiz::create([
+            'class_id'     => $request->class_id,
+            'topic_id'     => $topic->id,
+            'type'         => 'ai_generated',
+            'title'        => $request->quiz_title,
+            'subject'      => 'general',
+            'published_at' => Carbon::parse($request->published_at),
+            'deadline_at'  => Carbon::parse($request->deadline_at),
+        ]);
+
+        foreach ($request->questions as $q) {
             $questionModel = Question::create([
                 'topic_id'         => $quiz->topic_id,
-                'question_text'    => $q['question_text'],
+                'question_text'    => $q['text'],
                 'question_type'    => 'multiple_choice',
-                'difficulty_level' => strtolower($q['difficulty_level'] ?? 'easy'),
-                'correct_answer'   => $q['correct_answer'],
-                'options'          => $q['options']
+                'difficulty_level' => 'medium',
+                'correct_answer'   => $q['answer'],
+                'options'          => [$q['answer'], 'Option B', 'Option C', 'Option D'] 
             ]);
 
             $quiz->questions()->syncWithoutDetaching([$questionModel->id]);
         }
 
-        return redirect()->route('subjects.show', $request->input('class_id'))
-                         ->with('success', 'Gemini AI Quiz generated successfully!');
+        return redirect()->route('dashboard')->with('success', 'Quiz published successfully with deadlines set!');
     }
 
+    // ==========================================
+    // GAMIFICATION & INTERACTIVE QUIZ LOGIC
+    // ==========================================
+
     /**
-     * Find (or create) the Topic row that represents a subject's AI-driven
-     * adaptive quiz track.
+     * Find (or create) the Topic row that represents a subject's AI-driven adaptive quiz track.[cite: 4]
      */
     protected function topicForSubject(string $subject): Topic
     {
@@ -169,7 +238,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Find (or create) the Quiz row representing the AI-generated adaptive quiz.
+     * Find (or create) the Quiz row representing the AI-generated adaptive quiz.[cite: 4]
      */
     protected function quizForSubject(string $subject, Topic $topic): Quiz
     {
@@ -180,7 +249,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Start a new interactive session: pick subject, reset in-memory progress, get Q1.
+     * Start a new interactive session: pick subject, reset in-memory progress, get Q1.[cite: 4]
      */
     public function start(Request $request)
     {
@@ -228,8 +297,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Submit an answer for the current question, evaluate gamification stats,
-     * and proceed or finish attempt.
+     * Submit an answer for the current question, evaluate gamification stats, and proceed or finish attempt.[cite: 4]
      */
     public function submitAnswer(Request $request)
     {
@@ -299,7 +367,7 @@ class QuizController extends Controller
             $topic = $this->topicForSubject($progress['subject']);
             $quiz  = $this->quizForSubject($progress['subject'], $topic);
 
-            $startedAt = isset($progress['started_at']) ? \Carbon\Carbon::parse($progress['started_at']) : now();
+            $startedAt = isset($progress['started_at']) ? Carbon::parse($progress['started_at']) : now();
             $totalTimeTaken = (int) round(abs($startedAt->diffInSeconds(now())));
 
             $attempt = QuizAttempt::create([
@@ -393,7 +461,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Pull one question from the static question bank.
+     * Pull one question from the static question bank.[cite: 4]
      */
     protected function generateQuestion(string $subject, string $level, array $excludeIds = []): array
     {

@@ -42,10 +42,18 @@ Route::middleware('auth')->group(function () {
     // Quiz Routes (Static literal routes defined BEFORE parameterized wildcards)
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz.index');
     Route::get('/quiz/results', [QuizController::class, 'results'])->name('quiz.results');
-    Route::get('/quiz/{quiz}', [QuizController::class, 'show'])->name('quiz.show');
+    
+    // Quiz Creation Wizard (Teacher Only) - MUST BE BEFORE {quiz}
+    Route::get('/quiz/create', [QuizController::class, 'create'])->name('quiz.create');
+    Route::post('/quiz/generate', [QuizController::class, 'generate'])->name('quiz.generate');
+    Route::post('/quiz/store', [QuizController::class, 'store'])->name('quiz.store');
+    
     Route::post('/quiz/start', [QuizController::class, 'start'])->name('quiz.start');
     Route::post('/quiz/answer', [QuizController::class, 'submitAnswer'])->name('quiz.answer');
     Route::post('/quiz/generate-pdf', [QuizController::class, 'generateFromPdf'])->name('quiz.generateFromPdf');
+
+    // DYNAMIC ROUTE MUST GO LAST IN THE QUIZ SECTION
+    Route::get('/quiz/{quiz}', [QuizController::class, 'show'])->name('quiz.show');
 
     // Module Routes
     Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');

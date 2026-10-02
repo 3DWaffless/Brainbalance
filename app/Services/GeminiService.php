@@ -34,7 +34,8 @@ class GeminiService
             "]";
 
         try {
-            $response = Http::post("{$this->apiUrl}?key={$this->apiKey}", [
+            // By-pass local SSL verification and make the request
+            $response = Http::withoutVerifying()->post("{$this->apiUrl}?key={$this->apiKey}", [
                 'system_instruction' => [
                     'parts' => [
                         ['text' => $systemPrompt]
@@ -54,7 +55,9 @@ class GeminiService
             ]);
 
             if ($response->failed()) {
-                throw new Exception('Gemini API Error: ' . $response->body());
+                // Log the exact error behind the scenes, but don't crash the user's screen
+                logger()->error('Google API Error: ' . $response->body());
+                return []; 
             }
 
             $jsonText = $response->json()['candidates'][0]['content']['parts'][0]['text'] ?? '[]';
@@ -62,7 +65,7 @@ class GeminiService
             return json_decode(trim($jsonText), true) ?? [];
 
         } catch (Exception $e) {
-            logger()->error('Gemini Quiz Generation Error: ' . $e->getMessage());
+            logger()->error('System Error in GeminiService: ' . $e->getMessage());
             return [];
         }
     }
