@@ -8,7 +8,8 @@ use Exception;
 class GeminiService
 {
     protected string $apiKey;
-    protected string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    // CORRECT MODEL: gemini-3.8-flash
+    protected string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
     public function __construct()
     {
@@ -16,13 +17,13 @@ class GeminiService
     }
 
     /**
-     * Generate quiz questions from text content using Google Gemini.
+     * Generate quiz questions by sending the raw PDF directly to Gemini.
      */
-    public function generateQuizFromText(string $text, string $subject = 'Math', string $gradeLevel = 'Grade 3', int $itemCount = 5): array
+    public function generateQuizFromPdf(string $pdfBase64, string $subject = 'Math', string $gradeLevel = 'Grade 3', int $itemCount = 5): array
     {
-        $systemPrompt = "You are an AI educational assistant for elementary students (Grades 1-6). Generate {$itemCount} multiple-choice questions based ONLY on the provided text. Ensure questions match the target subject and grade level.";
+        $systemPrompt = "You are an AI educational assistant. Generate {$itemCount} multiple-choice questions based ONLY on the provided PDF document. Ensure questions match the target subject and grade level.";
 
-        $userPrompt = "Subject: {$subject}\nGrade Level: {$gradeLevel}\n\nPDF Content:\n{$text}\n\n" .
+        $userPrompt = "Subject: {$subject}\nGrade Level: {$gradeLevel}\n\n" .
             "Return ONLY a JSON array with no markdown blocks or extra commentary outside the JSON array, using this format:\n" .
             "[\n" .
             "  {\n" .
@@ -34,17 +35,21 @@ class GeminiService
             "]";
 
         try {
-            // By-pass local SSL verification and make the request
-            $response = Http::withoutVerifying()->post("{$this->apiUrl}?key={$this->apiKey}", [
+            // By-pass SSL, increase timeout to 3 minutes, and make the request
+            $response = Http::withoutVerifying()->timeout(180)->post("{$this->apiUrl}?key={$this->apiKey}", [
                 'system_instruction' => [
-                    'parts' => [
-                        ['text' => $systemPrompt]
-                    ]
+                    'parts' => [['text' => $systemPrompt]]
                 ],
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => $userPrompt]
+                            ['text' => $userPrompt],
+                            [
+                                'inline_data' => [
+                                    'mime_type' => 'application/pdf',
+                                    'data'      => $pdfBase64
+                                ]
+                            ]
                         ]
                     ]
                 ],
@@ -55,9 +60,8 @@ class GeminiService
             ]);
 
             if ($response->failed()) {
-                // Log the exact error behind the scenes, but don't crash the user's screen
-                logger()->error('Google API Error: ' . $response->body());
-                return []; 
+                // TEMPORARY: Show exact error from Google
+                dd('Google API Error: ' . $response->body());
             }
 
             $jsonText = $response->json()['candidates'][0]['content']['parts'][0]['text'] ?? '[]';
@@ -65,8 +69,8 @@ class GeminiService
             return json_decode(trim($jsonText), true) ?? [];
 
         } catch (Exception $e) {
-            logger()->error('System Error in GeminiService: ' . $e->getMessage());
-            return [];
+            // TEMPORARY: Show exact system error
+            dd('System Error in GeminiService: ' . $e->getMessage());
         }
     }
 }

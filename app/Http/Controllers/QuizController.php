@@ -105,7 +105,7 @@ class QuizController extends Controller
         return view('quiz.create', compact('classes'));
     }
 
-    /**
+/**
      * STEP 2: Process PDF and Generate Questions with AI
      */
     public function generate(Request $request)
@@ -121,49 +121,30 @@ class QuizController extends Controller
 
         $file = $request->file('module_pdf');
         
+        // 1. Convert the raw PDF to Base64 to send directly to Google
         try {
-            $parser = new PdfParser();
-            $pdf = $parser->parseFile($file->getPathname());
-            
-            $extractedText = '';
-            foreach ($pdf->getPages() as $page) {
-                $pageText = $page->getText();
-                if (!empty($pageText)) {
-                    $extractedText .= $pageText . "\n";
-                }
-            }
-
-            // Fallback if page-by-page extraction returns empty text
-            $details = $pdf->getDetails();
-            if (empty(trim($extractedText)) && isset($details['Texts'])) {
-                $extractedText = implode("\n", $details['Texts']);
-            }
-
-            $extractedText = substr(trim($extractedText), 0, 4000); 
+            $pdfBase64 = base64_encode(file_get_contents($file->getPathname()));
         } catch (\Throwable $e) {
-            return back()->with('error', 'PDF Extraction Failed: ' . $e->getMessage());
-        }
-
-        if (empty(trim($extractedText))) {
-            return back()->with('error', 'The uploaded PDF appears to be empty or contains scanned images without selectable text. Please upload a text-based PDF document.');
+            return back()->with('error', 'Could not read the uploaded file.');
         }
 
         if (!$this->ai) {
             return back()->with('error', 'Gemini AI service is not configured.');
         }
 
-        // Generate Questions via Gemini Service
-        $aiQuestions = $this->ai->generateQuizFromText(
-            $extractedText,
+        // 2. Send the PDF directly to Gemini (No PHP parsing needed!)
+        $aiQuestions = $this->ai->generateQuizFromPdf(
+            $pdfBase64,
             'General', 
             'Grade 3',
             $request->question_count
         );
 
         if (empty($aiQuestions)) {
-            return back()->with('error', 'Failed to generate quiz questions using Gemini AI.');
+            return back()->with('error', 'Failed to generate quiz questions using Gemini AI. The AI may be busy or the PDF is too large.');
         }
 
+        // 3. Format the questions for the view
         $generatedQuestions = array_map(function($q) {
             return [
                 'question' => $q['question_text'] ?? 'Question Text Missing',

@@ -414,7 +414,7 @@
         function switchTab(tab) {
             document.getElementById('panel-login').classList.toggle('active', tab === 'login');
             document.getElementById('panel-register').classList.toggle('active', tab === 'register');
-            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getEl  ementById('tab-login').classList.toggle('active', tab === 'login');
             document.getElementById('tab-register').classList.toggle('active', tab === 'register');
         }
 
