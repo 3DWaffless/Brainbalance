@@ -1,33 +1,66 @@
-<?php
-// FILE: app/Http/Controllers/ClassroomController.php
+<?php // FILE: app/Http/Controllers/ClassroomController.php
 
 namespace App\Http\Controllers;
 
 use App\Models\Classroom;
+use App\Models\Quiz; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ClassroomController extends Controller
 {
     // ---------------------------------------------------------------
-    // DASHBOARD — shows different view based on role
+    // DASHBOARD   shows different view based on role
     // ---------------------------------------------------------------
-
-    public function dashboard()
+public function dashboard()
     {
         $user = Auth::user();
 
         if ($user->isTeacher()) {
             // Teacher sees their own classes + student counts
             $classes = $user->ownedClasses()->withCount('students')->latest()->get();
-            return view('dashboard', compact('classes'));
+            
+            // Calculate total students across all classes
+            $totalStudents = $classes->sum('students_count');
+
+            // Fetch quizzes belonging to any of the teacher's classes
+            $quizzes = Quiz::whereIn('class_id', $classes->pluck('id'))->latest()->get();
+
+            return view('dashboard', compact('classes', 'quizzes', 'totalStudents'));
         }
 
         // Student sees classes they've joined
         $classes = $user->joinedClasses()->with('teacher')->latest()->get();
-        return view('dashboard', compact('classes'));
+        
+        // Fetch quizzes attached to the student's joined classes
+        $quizzes = Quiz::whereIn('class_id', $classes->pluck('id'))->latest()->get();
+
+        return view('dashboard', compact('classes', 'quizzes'));
     }
 
+    /**
+     * Display the specific class workspace (Students, Quizzes, Modules)
+     */
+public function show(Classroom $classroom)
+    {
+        $user = Auth::user();
+
+        if ($user->isTeacher()) {
+            abort_unless($classroom->teacher_id === $user->id, 403, 'You do not own this class.');
+        } else {
+            abort_unless($user->joinedClasses->contains($classroom->id), 403, 'You are not enrolled in this class.');
+        }
+
+        $classroom->load('students');
+        $quizzes = \App\Models\Quiz::where('class_id', $classroom->id)->latest()->get();
+        
+        // Fetch the existing modules for this class
+        $modules = \App\Models\Module::where('class_id', $classroom->id)->latest()->get(); 
+
+        return view('classroom.show', compact('classroom', 'quizzes', 'modules'));
+    }
+
+    
     // ---------------------------------------------------------------
     // TEACHER — create a class
     // ---------------------------------------------------------------

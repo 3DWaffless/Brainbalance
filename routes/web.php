@@ -33,17 +33,22 @@ Route::middleware('auth')->group(function () {
 
     // Classroom Routes
     Route::get('/dashboard', [ClassroomController::class, 'dashboard'])->name('dashboard');
+    Route::get('/classes/{classroom}', [ClassroomController::class, 'show'])->name('classes.show');
     Route::post('/classes', [ClassroomController::class, 'store'])->name('classes.store');
     Route::delete('/classes/{classroom}', [ClassroomController::class, 'destroy'])->name('classes.destroy');
     Route::delete('/classes/{classroom}/students/{student}', [ClassroomController::class, 'removeStudent'])->name('classes.removeStudent');
     Route::post('/classes/join', [ClassroomController::class, 'join'])->name('classes.join');
     Route::delete('/classes/{classroom}/leave', [ClassroomController::class, 'leave'])->name('classes.leave');
 
-    // Quiz Routes (Static literal routes defined BEFORE parameterized wildcards)
+    // Quiz Routes
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz.index');
     Route::get('/quiz/results', [QuizController::class, 'results'])->name('quiz.results');
-    
-    // Quiz Creation Wizard (Teacher Only) - MUST BE BEFORE {quiz}
+
+    // Student Quiz History & Attempt Review
+    Route::get('/quizzes/history', [QuizController::class, 'history'])->name('quiz.history');
+    Route::get('/quizzes/attempt/{attempt}/review', [QuizController::class, 'review'])->name('quiz.review');
+
+    // Quiz Creation Wizard (Teacher Only)
     Route::get('/quiz/create', [QuizController::class, 'create'])->name('quiz.create');
     Route::post('/quiz/generate', [QuizController::class, 'generate'])->name('quiz.generate');
     Route::post('/quiz/store', [QuizController::class, 'store'])->name('quiz.store');
@@ -51,6 +56,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/quiz/start', [QuizController::class, 'start'])->name('quiz.start');
     Route::post('/quiz/answer', [QuizController::class, 'submitAnswer'])->name('quiz.answer');
     Route::post('/quiz/generate-pdf', [QuizController::class, 'generateFromPdf'])->name('quiz.generateFromPdf');
+
+    // Edit and Delete Routes
+    Route::get('/quiz/{quiz}/edit', [QuizController::class, 'edit'])->name('quiz.edit');
+    Route::put('/quiz/{quiz}', [QuizController::class, 'update'])->name('quiz.update');
+    Route::delete('/quiz/{quiz}', [QuizController::class, 'destroy'])->name('quiz.destroy');
 
     // DYNAMIC ROUTE MUST GO LAST IN THE QUIZ SECTION
     Route::get('/quiz/{quiz}', [QuizController::class, 'show'])->name('quiz.show');

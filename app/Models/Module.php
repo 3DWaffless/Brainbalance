@@ -10,6 +10,7 @@ class Module extends Model
     use HasFactory;
 
     protected $fillable = [
+        'class_id', // <-- Added to allow saving
         'topic_id',
         'title',
         'description',
@@ -22,5 +23,10 @@ class Module extends Model
     public function topic()
     {
         return $this->belongsTo(Topic::class);
+    }
+
+    public function classroom()
+    {
+        return $this->belongsTo(Classroom::class, 'class_id');
     }
 }

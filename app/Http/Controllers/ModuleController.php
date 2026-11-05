@@ -3,88 +3,103 @@
 namespace App\Http\Controllers;
 
 use App\Models\Module;
-use App\Models\Topic;
+use App\Models\Classroom;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ModuleController extends Controller
 {
+    protected ?GeminiService $ai = null;
+
+    public function __construct()
+    {
+        try {
+            $this->ai = app(GeminiService::class);
+        } catch (\Throwable $e) {
+            $this->ai = null;
+        }
+    }
+
     public function index()
     {
-        $modules = Module::with('topic')->latest()->get();
-        $topics = Topic::all();
+        $user = Auth::user();
 
-        return view('modules.index', compact('modules', 'topics'));
+        if ($user->isTeacher()) {
+            $classIds = $user->ownedClasses->pluck('id');
+        } else {
+            $classIds = $user->joinedClasses->pluck('id');
+        }
+
+        $modules = Module::whereIn('class_id', $classIds)->latest()->get();
+        return view('modules.index', compact('modules'));
     }
 
     public function store(Request $request)
     {
-        if (Auth::user()->role !== 'teacher') {
-            abort(403, 'Unauthorized action. Only teachers can upload modules.');
-        }
+        abort_unless(Auth::user()->isTeacher(), 403);
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'topic_id' => ['nullable', 'exists:topics,id'],
-            'module_file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx,zip', 'max:10240'],
+        $request->validate([
+            'class_id' => 'required|exists:classes,id',
+            'title'    => 'required|string|max:255',
+            'file'     => 'required|file|mimes:pdf,doc,docx,ppt,pptx,jpg,jpeg,png|max:10240',
         ]);
 
-        if ($request->hasFile('module_file')) {
-            $file = $request->file('module_file');
-            
-            $originalName = $file->getClientOriginalName();
-            $extension = $file->getClientOriginalExtension();
-            $fileSize = round($file->getSize() / 1024);
-            
-            $path = $file->store('modules', 'public');
+        $file = $request->file('file');
+        $filePath = $file->store('modules', 'public');
 
-            Module::create([
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'topic_id' => $validated['topic_id'] ?? null,
-                'file_path' => $path,
-                'file_name' => $originalName,
-                'file_size' => $fileSize,
-                'file_type' => strtolower($extension),
-            ]);
-        }
+        Module::create([
+            'class_id'  => $request->class_id,
+            'title'     => $request->title,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $filePath,
+            'file_type' => $file->getClientOriginalExtension(),
+        ]);
 
-        return redirect()->back()->with('status', 'module-uploaded');
+        return back()->with('success', 'Module uploaded successfully!');
     }
 
-    // Serve file inline for browser embedding
+    /**
+     * Serve the file directly to the browser for inline viewing (PDFs/Images/Docs).
+     */
     public function view(Module $module)
     {
-        if (!Storage::disk('public')->exists($module->file_path)) {
-            abort(404, 'File not found.');
+        $user = Auth::user();
+
+        if ($user->isStudent() && !$user->joinedClasses->contains($module->class_id)) {
+            abort(403, 'You are not enrolled in this class.');
         }
 
-        $fullPath = storage_path('app/public/' . $module->file_path);
+        if ($user->isTeacher() && !$user->ownedClasses->contains($module->class_id)) {
+            abort(403, 'Unauthorized access to this module.');
+        }
 
-        $mimeTypes = [
-            'pdf'  => 'application/pdf',
-            'doc'  => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'ppt'  => 'application/vnd.ms-powerpoint',
-            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ];
+        $fullPath = Storage::disk('public')->path($module->file_path);
 
-        $contentType = $mimeTypes[$module->file_type] ?? 'application/octet-stream';
+        if (!file_exists($fullPath)) {
+            abort(404, 'Module file not found on server.');
+        }
+
+        $mimeType = Storage::disk('public')->mimeType($module->file_path) ?? 'application/pdf';
 
         return response()->file($fullPath, [
-            'Content-Type' => $contentType,
+            'Content-Type'        => $mimeType,
             'Content-Disposition' => 'inline; filename="' . $module->file_name . '"',
         ]);
     }
 
     public function download(Module $module)
     {
-        if (!Storage::disk('public')->exists($module->file_path)) {
-            abort(404, 'File not found.');
+        $user = Auth::user();
+
+        if ($user->isStudent() && !$user->joinedClasses->contains($module->class_id)) {
+            abort(403);
+        }
+
+        if ($user->isTeacher() && !$user->ownedClasses->contains($module->class_id)) {
+            abort(403);
         }
 
         return Storage::disk('public')->download($module->file_path, $module->file_name);
@@ -92,63 +107,56 @@ class ModuleController extends Controller
 
     public function destroy(Module $module)
     {
-        if (Auth::user()->role !== 'teacher') {
-            abort(403, 'Unauthorized action. Only teachers can delete modules.');
-        }
+        abort_unless(Auth::user()->isTeacher(), 403);
+        abort_unless(Auth::user()->ownedClasses->contains($module->class_id), 403);
 
-        if (Storage::disk('public')->exists($module->file_path)) {
-            Storage::disk('public')->delete($module->file_path);
-        }
-
+        Storage::disk('public')->delete($module->file_path);
         $module->delete();
 
-        return redirect()->back()->with('status', 'module-deleted');
+        return back()->with('success', 'Module deleted successfully!');
     }
 
-    // Gemini AI Chat endpoint
+    /**
+     * AI Study Assistant Handler for Module Guidance.
+     */
     public function aiChat(Request $request, Module $module)
     {
-        $request->validate([
-            'prompt' => 'required|string|max:1000',
-        ]);
-
-        $apiKey = env('GEMINI_API_KEY') ?? config('services.gemini.key');
-
-        if (!$apiKey) {
-            return response()->json([
-                'reply' => "Gemini API Key is not set in `.env` (`GEMINI_API_KEY`). Please add it to start chatting!"
-            ]);
-        }
-
-        $systemContext = "You are BrainBalance AI Study Assistant. The user is currently studying the module entitled: '{$module->title}'. Module description: '{$module->description}'. Answer the student concisely, supportively, and accurately to help them learn this topic.";
-
         try {
-            $response = Http::withoutVerifying()->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={$apiKey}", [
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            ['text' => $systemContext . "\n\nStudent Question: " . $request->prompt]
-                        ]
-                    ]
-                ]
-            ]);
+            $user = Auth::user();
 
-            if ($response->failed()) {
-                Log::error('Gemini API Error', ['body' => $response->body()]);
-                $errorMsg = $response->json()['error']['message'] ?? 'API request failed.';
-                return response()->json([
-                    'reply' => "Gemini API Error ({$response->status()}): {$errorMsg}"
-                ]);
+            if (!$user) {
+                return response()->json(['error' => 'Unauthenticated.'], 401);
             }
 
-            $responseData = $response->json();
-            $reply = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? 'Sorry, I could not generate a response right now.';
+            if ($user->isStudent() && method_exists($user, 'joinedClasses') && $user->joinedClasses) {
+                if (!$user->joinedClasses->contains($module->class_id)) {
+                    return response()->json(['error' => 'You are not enrolled in this class.'], 403);
+                }
+            }
+
+            $userPrompt = $request->input('prompt') ?? $request->input('message');
+            if (empty($userPrompt)) {
+                return response()->json(['error' => 'A message prompt is required.'], 422);
+            }
+
+            if (!$this->ai) {
+                $this->ai = app(GeminiService::class);
+            }
+
+            $prompt = "You are BrainBalance AI, a friendly elementary school tutor. " .
+                      "The student is asking a question about the study module titled '{$module->title}'. " .
+                      "Student Question: \"{$userPrompt}\". " .
+                      "Provide a simple, clear, encouraging answer suitable for young learners.";
+
+            $reply = $this->ai->askQuestion($prompt);
 
             return response()->json(['reply' => $reply]);
-        } catch (\Exception $e) {
-            Log::error('Gemini Exception', ['message' => $e->getMessage()]);
-            return response()->json(['reply' => 'Connection error: ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            Log::error("Gemini AI Chat Error: " . $e->getMessage(), ['exception' => $e]);
+
+            return response()->json([
+                'reply' => "⚠️ AI Error: " . $e->getMessage()
+            ], 200);
         }
     }
 }

@@ -1,151 +1,96 @@
-{{-- FILE: resources/views/quiz/results.blade.php --}}
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Quiz Results — {{ config('app.name', 'BrainBalance') }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+@extends('layouts.app')
 
-        body {
-            font-family: 'Nunito', sans-serif;
-            background: #FFF8F0;
-            min-height: 100vh;
-            padding: 2.5rem 1.5rem;
-        }
+@section('title', 'Class Analytics & Diagnostics - BrainBalance')
 
-        .wrap { max-width: 900px; margin: 0 auto; }
+@section('content')
+<div class="topbar">
+    <div>
+        <div style="font-size: 11px; font-weight: 800; color: #aaa; text-transform: uppercase;">Teacher Command Center</div>
+        <div class="tgreet" style="color: #FF6B6B;">📊 Class Performance & Weak Topic Diagnostics</div>
+        <div class="tsub">Track student quiz results, identify struggling topics, and measure engagement.</div>
+    </div>
+    <a href="{{ route('dashboard') }}" class="btn-ghost">&larr; Back to Dashboard</a>
+</div>
 
-        .back-link {
-            display: inline-flex; align-items: center; gap: 6px;
-            font-size: 13px; font-weight: 800; color: #aaa;
-            text-decoration: none; margin-bottom: 1.25rem;
-        }
-        .back-link:hover { color: #FF6B6B; }
+<div class="dashboard-grid">
+    {{-- KPI Cards --}}
+    <div class="col-12" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 10px;">
+        <div class="card" style="text-align: center; margin-bottom: 0;">
+            <div class="card-sub">Total Submissions</div>
+            <div style="font-size: 28px; font-weight: 900; color: #FF6B6B; margin-top: 4px;">{{ $totalAttempts }}</div>
+        </div>
+        <div class="card" style="text-align: center; margin-bottom: 0;">
+            <div class="card-sub">Average Score</div>
+            <div style="font-size: 28px; font-weight: 900; color: #4ECDC4; margin-top: 4px;">{{ $avgScore }} pts</div>
+        </div>
+        <div class="card" style="text-align: center; margin-bottom: 0;">
+            <div class="card-sub">Overall Accuracy</div>
+            <div style="font-size: 28px; font-weight: 900; color: #FFB347; margin-top: 4px;">{{ $overallAccuracy }}%</div>
+        </div>
+    </div>
 
-        h1 { font-size: 22px; font-weight: 900; color: #2D2D2D; margin-bottom: 4px; }
-        .sub { font-size: 13px; font-weight: 700; color: #aaa; margin-bottom: 1.75rem; }
+    {{-- Weak Topic Diagnostics --}}
+    <div class="col-8 card">
+        <div class="card-title" style="margin-bottom: 15px;">
+            <span>⚠️ Weak Topic Diagnostics (Lowest Accuracy Tiers)</span>
+        </div>
 
-        .card {
-            background: #fff;
-            border-radius: 18px;
-            border: 2px solid #FFE4C4;
-            overflow: hidden;
-        }
+        @if(!empty($topicStats))
+            <div class="item-list">
+                @foreach($topicStats as $topicName => $stats)
+                    @php
+                        $topicAccuracy = $stats['total'] > 0 ? round(($stats['correct'] / $stats['total']) * 100) : 0;
+                        $color = $topicAccuracy < 50 ? '#E74C3C' : ($topicAccuracy < 75 ? '#FFB347' : '#2ECC71');
+                    @endphp
+                    <div style="padding: 14px; border: 2px solid #FFE4C4; border-radius: 12px; background: #FFF8F0; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 15px; font-weight: 900; color: #2D2D2D;">{{ $topicName }}</span>
+                            <span style="font-size: 13px; font-weight: 900; color: {{ $color }};">{{ $topicAccuracy }}% Correct</span>
+                        </div>
 
-        table { width: 100%; border-collapse: collapse; }
+                        {{-- Progress Bar --}}
+                        <div style="height: 10px; background: #FFE4C4; border-radius: 50px; overflow: hidden;">
+                            <div style="width: {{ $topicAccuracy }}%; height: 100%; background: {{ $color }}; border-radius: 50px;"></div>
+                        </div>
 
-        thead th {
-            text-align: left;
-            font-size: 11px; font-weight: 900; color: #aaa;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            padding: 14px 16px;
-            background: #FFF8F0;
-            border-bottom: 2px solid #FFE4C4;
-        }
-
-        tbody td {
-            padding: 14px 16px;
-            font-size: 13px; font-weight: 700; color: #2D2D2D;
-            border-bottom: 1px solid #FFE4C4;
-        }
-
-        tbody tr:last-child td { border-bottom: none; }
-        tbody tr:hover { background: #FFF8F0; }
-
-        .subject-tag {
-            display: inline-flex; align-items: center; gap: 5px;
-            font-size: 11px; font-weight: 900; padding: 3px 10px;
-            border-radius: 999px;
-        }
-        .subject-math { background: #FFE4E1; color: #FF6B6B; }
-        .subject-english { background: #DFF7F5; color: #4ECDC4; }
-
-        .level-pill {
-            font-size: 11px; font-weight: 900; padding: 3px 10px;
-            border-radius: 999px; background: #FFE4C4; color: #2D2D2D;
-            text-transform: capitalize;
-        }
-
-        .accuracy-bar-track {
-            width: 80px; height: 6px; background: #FFE4C4;
-            border-radius: 999px; overflow: hidden;
-        }
-        .accuracy-bar-fill {
-            height: 100%; border-radius: 999px;
-            background: linear-gradient(90deg, #FF6B6B, #4ECDC4);
-        }
-
-        .empty-state { text-align: center; padding: 3rem 1rem; }
-        .empty-emoji { font-size: 44px; margin-bottom: 10px; }
-        .empty-title { font-size: 15px; font-weight: 900; color: #2D2D2D; margin-bottom: 4px; }
-        .empty-sub { font-size: 13px; font-weight: 700; color: #aaa; }
-    </style>
-</head>
-<body>
-
-<div class="wrap">
-    <a href="{{ route('dashboard') }}" class="back-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        Back to dashboard
-    </a>
-
-    <h1>Quiz Results 📊</h1>
-    <p class="sub">Every completed quiz attempt across all students</p>
-
-    <div class="card">
-        @if($sessions->isEmpty())
-            <div class="empty-state">
-                <div class="empty-emoji">📭</div>
-                <div class="empty-title">No quiz attempts yet</div>
-                <div class="empty-sub">Results will appear here once students complete a quiz.</div>
+                        <div style="font-size: 11px; font-weight: 700; color: #aaa; margin-top: 6px;">
+                            Based on {{ $stats['total'] }} answered questions in this topic.
+                            @if($topicAccuracy < 50)
+                                <strong style="color: #E74C3C;">Recommendation: Upload a supplementary review module.</strong>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
             </div>
         @else
-            <table>
-                <thead>
-                    <tr>
-                        <th>Student</th>
-                        <th>Subject</th>
-                        <th>Score</th>
-                        <th>Accuracy</th>
-                        <th>Final level</th>
-                        <th>Completed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($sessions as $session)
-                        <tr>
-                            @php($subject = strtolower($session->quiz->topic->subject ?? ''))
-                            <td>{{ $session->student->first_name }} {{ $session->student->last_name }}</td>
-                            <td>
-                                <span class="subject-tag {{ $subject === 'math' ? 'subject-math' : 'subject-english' }}">
-                                    {{ $subject === 'math' ? '🔢 Math' : '📖 English' }}
-                                </span>
-                            </td>
-                            <td>{{ $session->score }}/{{ $session->total_questions }}</td>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:8px">
-                                    <div class="accuracy-bar-track">
-                                        <div class="accuracy-bar-fill" style="width:{{ $session->accuracy }}%"></div>
-                                    </div>
-                                    <span>{{ $session->accuracy }}%</span>
-                                </div>
-                            </td>
-                            <td><span class="level-pill">{{ $session->weakestTopic ? 'weak spot' : 'solid' }}</span></td>
-                            <td>{{ $session->created_at?->format('M j, Y g:i A') }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+            <div class="empty-state" style="padding: 2rem 1rem;">
+                <p style="font-size:13px; color:#aaa; font-weight:700;">No diagnostic data collected yet.</p>
+            </div>
+        @endif
+    </div>
+
+    {{-- Recent Submissions --}}
+    <div class="col-4 card">
+        <div class="card-title" style="margin-bottom: 15px;"><span>📜 Recent Submissions</span></div>
+
+        @if($sessions->count() > 0)
+            <div class="item-list">
+                @foreach($sessions->take(8) as $s)
+                    <div style="padding: 10px 12px; border: 1px solid #FFE4C4; border-radius: 10px; font-size: 13px; background: #fff; margin-bottom: 8px;">
+                        <div style="font-weight: 900; color: #2D2D2D;">
+                            {{ $s->student->first_name ?? 'Student' }} {{ $s->student->last_name ?? '' }}
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: #aaa; margin-top: 2px;">
+                            {{ $s->quiz->title ?? 'Quiz' }} &bull; Score: {{ $s->score }}/{{ $s->total_questions }} (+{{ $s->total_xp }} XP)
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="empty-state" style="padding: 2rem 1rem;">
+                <p style="font-size:13px; color:#aaa; font-weight:700;">No quiz attempts logged yet.</p>
+            </div>
         @endif
     </div>
 </div>
-
-</body>
-</html>
+@endsection

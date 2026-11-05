@@ -19,6 +19,7 @@ class User extends Authenticatable
         'role',
         'total_xp',
         'level',
+        'avatar',
     ];
 
     protected $hidden = [
@@ -32,6 +33,36 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
         ];
+    }
+
+    // ---------------------------------------------------------------
+    // ACCESSORS
+    // ---------------------------------------------------------------
+
+    /**
+     * Get full URL for avatar, handling both local storage and full external/cloud URLs.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!$this->avatar) {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+
+        return asset('storage/' . $this->avatar);
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
+
+    public function getInitialsAttribute(): string
+    {
+        return strtoupper(substr($this->first_name ?? 'U', 0, 1) . substr($this->last_name ?? '', 0, 1));
     }
 
     // ---------------------------------------------------------------
@@ -58,10 +89,6 @@ class User extends Authenticatable
         return $this->isTeacher() ? $this->ownedClasses() : $this->joinedClasses();
     }
 
-    // ---------------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------------
-
     public function quizAttempts()
     {
         return $this->hasMany(QuizAttempt::class, 'student_id');
@@ -83,16 +110,10 @@ class User extends Authenticatable
                     ->withPivot('earned_at');
     }
 
+    // ---------------------------------------------------------------
+    // HELPERS
+    // ---------------------------------------------------------------
+
     public function isStudent(): bool { return $this->role === 'student'; }
     public function isTeacher(): bool { return $this->role === 'teacher'; }
-
-    public function getFullNameAttribute(): string
-    {
-        return $this->first_name . ' ' . $this->last_name;
-    }
-
-    public function getInitialsAttribute(): string
-    {
-        return strtoupper(substr($this->first_name, 0, 1) . substr($this->last_name, 0, 1));
-    }
 }

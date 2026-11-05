@@ -6,23 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('modules_and_quizzes', function (Blueprint $table) {
-            //
+        Schema::table('quizzes', function (Blueprint $table) {
+            $table->string('subject')->nullable(); // Added as nullable so old quizzes don't crash
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('modules_and_quizzes', function (Blueprint $table) {
-            //
+        Schema::table('quizzes', function (Blueprint $table) {
+            $table->dropColumn('subject');
         });
     }
 };

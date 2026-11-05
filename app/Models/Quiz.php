@@ -7,17 +7,30 @@ use Illuminate\Database\Eloquent\Model;
 class Quiz extends Model
 {
     protected $fillable = [
+        'title',
+        'description',
+        'subject',
+        'class_id',
         'topic_id',
         'type',
-        'title',
         'config',
+        'published_at',
+        'deadline_at',
+        'max_attempts',
     ];
 
     protected function casts(): array
     {
         return [
-            'config' => 'array',
+            'config'       => 'array',
+            'published_at' => 'datetime',
+            'deadline_at'  => 'datetime',
         ];
+    }
+
+    public function classroom()
+    {
+        return $this->belongsTo(Classroom::class, 'class_id');
     }
 
     public function topic()

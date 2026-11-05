@@ -6,28 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('quizzes', function (Blueprint $table) {
-            $table->foreignId('class_id')
-                  ->nullable()
-                  ->after('id')
-                  ->constrained('classes')
-                  ->nullOnDelete();
+            // Default 1 attempt per quiz; nullable allows unlimited if set to null
+            $table->integer('max_attempts')->default(1)->nullable()->after('deadline_at');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('quizzes', function (Blueprint $table) {
-            $table->dropForeign(['class_id']);
-            $table->dropColumn('class_id');
+            $table->dropColumn('max_attempts');
         });
     }
 };

@@ -13,7 +13,6 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
-use Smalot\PdfParser\Parser as PdfParser;
 
 class QuizController extends Controller
 {
@@ -24,14 +23,10 @@ class QuizController extends Controller
         try {
             $this->ai = app(GeminiService::class);
         } catch (\Throwable $e) {
-            // No API key configured yet — the quiz will fall back to the static question bank.
             $this->ai = null;
         }
     }
 
-    /**
-     * Show all quizzes available to the user or quiz creation hub.
-     */
     public function index()
     {
         $user = Auth::user();
@@ -43,87 +38,153 @@ class QuizController extends Controller
         }
 
         if ($user->joinedClasses()->count() === 0) {
-            return redirect()->route('dashboard')
-                ->with('error', 'You need to join a class before you can take a quiz.');
+            return redirect()->route('dashboard')->with('error', 'You need to join a class before you can take a quiz.');
         }
 
         $quizzes = Quiz::whereIn('class_id', $user->joinedClasses->pluck('id'))->latest()->get();
         return view('quiz.play', compact('quizzes'));
     }
 
-    /**
-     * Display a specific class quiz for a student to attempt.[cite: 4]
-     */
+    public function history()
+    {
+        $user = Auth::user();
+        abort_unless($user->isStudent(), 403, 'Only students can view their quiz history.');
+
+        $attempts = QuizAttempt::with('quiz.classroom')
+            ->where('student_id', $user->id)
+            ->latest()
+            ->paginate(10);
+
+        return view('quiz.history', compact('attempts'));
+    }
+
+    public function review(QuizAttempt $attempt)
+    {
+        $user = Auth::user();
+
+        if ($user->isStudent() && $attempt->student_id !== $user->id) {
+            abort(403, 'Unauthorized access to this quiz review.');
+        }
+
+        if ($user->isTeacher()) {
+            $attempt->load('quiz');
+            abort_unless($user->ownedClasses->contains($attempt->quiz->class_id), 403, 'Unauthorized access.');
+        }
+
+        $attempt->load(['quiz.classroom', 'responses.question', 'student']);
+
+        return view('quiz.review', compact('attempt'));
+    }
+
     public function show(Quiz $quiz)
     {
         $user = Auth::user();
 
-        // Security check: Ensure student belongs to the class
-        if ($user->isStudent() && !$user->joinedClasses->contains($quiz->class_id)) {
-            abort(403, 'You are not enrolled in the class for this quiz.');
+        if ($user->isStudent()) {
+            if (!$user->joinedClasses->contains($quiz->class_id)) {
+                abort(403, 'You are not enrolled in the class for this quiz.');
+            }
+
+            $attemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
+                ->where('student_id', $user->id)
+                ->count();
+
+            if ($quiz->max_attempts && $attemptsCount >= $quiz->max_attempts) {
+                return redirect()->route('dashboard')->with('error', 'This quiz is closed. You have used all available attempts.');
+            }
         }
 
-        // ENFORCE DEADLINE
         if ($quiz->deadline_at && now()->greaterThan($quiz->deadline_at)) {
-            abort(403, 'The deadline for this quiz has passed. It is no longer accessible.');
+            abort(403, 'The deadline for this quiz has passed.');
         }
 
         $quiz->load('questions');
-
-        return view('quiz.show', compact('quiz'));
+        return view('quiz.play', compact('quiz'));
     }
 
-    /**
-     * Show all quiz attempt results — for teachers.[cite: 4]
-     */
     public function results()
     {
         abort_unless(Auth::user()->isTeacher(), 403);
 
-        $sessions = QuizAttempt::with(['student', 'quiz.topic', 'weakestTopic'])
-            ->whereHas('student.joinedClasses', function ($query) {
-                $query->where('teacher_id', Auth::id());
+        $user = Auth::user();
+        $ownedClassIds = $user->ownedClasses->pluck('id');
+
+        $sessions = QuizAttempt::with(['student', 'quiz.classroom', 'quiz.topic'])
+            ->whereHas('quiz', function ($query) use ($ownedClassIds) {
+                $query->whereIn('class_id', $ownedClassIds);
             })
             ->latest('created_at')
             ->get();
 
-        return view('quiz.results', compact('sessions'));
+        // Calculate Analytics KPIs
+        $totalAttempts = $sessions->count();
+        $avgScore = $totalAttempts > 0 ? round($sessions->avg('score'), 1) : 0;
+        $totalQuestionsAsked = $sessions->sum('total_questions');
+        $totalCorrectAnswers = $sessions->sum('score');
+        $overallAccuracy = $totalQuestionsAsked > 0 ? round(($totalCorrectAnswers / $totalQuestionsAsked) * 100) : 0;
+
+        // Weak Topic Diagnostic Engine
+        $responses = QuestionResponse::with(['question.topic', 'quizAttempt.quiz'])
+            ->whereHas('quizAttempt.quiz', function ($query) use ($ownedClassIds) {
+                $query->whereIn('class_id', $ownedClassIds);
+            })
+            ->get();
+
+        $topicStats = [];
+        foreach ($responses as $resp) {
+            $topicName = $resp->question->topic->name ?? ($resp->quizAttempt->quiz->subject ?? 'General');
+            $topicName = ucfirst($topicName);
+
+            if (!isset($topicStats[$topicName])) {
+                $topicStats[$topicName] = ['correct' => 0, 'total' => 0];
+            }
+            $topicStats[$topicName]['total']++;
+            if ($resp->is_correct) {
+                $topicStats[$topicName]['correct']++;
+            }
+        }
+
+        uasort($topicStats, function ($a, $b) {
+            $accA = $a['total'] > 0 ? ($a['correct'] / $a['total']) : 0;
+            $accB = $b['total'] > 0 ? ($b['correct'] / $b['total']) : 0;
+            return $accA <=> $accB; // Weakest topics first
+        });
+
+        return view('quiz.results', compact('sessions', 'totalAttempts', 'avgScore', 'overallAccuracy', 'topicStats'));
     }
 
-    // ==========================================
-    // AI QUIZ CREATION WIZARD (STEP 1, 2 & 3)
-    // ==========================================
-
-    /**
-     * STEP 1: Show the Quiz Creation Form (Upload PDF)
-     */
-    public function create()
+    public function create(Request $request)
     {
         abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized.');
-        
-        $classes = Auth::user()->classes ?? Auth::user()->ownedClasses; // Fallback to avoid relationship conflicts
-        return view('quiz.create', compact('classes'));
+
+        $user = Auth::user();
+        $classes = $user->ownedClasses;
+
+        if ($request->has('class_id')) {
+            $selectedClass = $classes->where('id', $request->query('class_id'))->firstOrFail();
+            return view('quiz.create', compact('selectedClass', 'classes'));
+        }
+
+        return view('quiz.select-class', compact('classes'));
     }
 
-/**
-     * STEP 2: Process PDF and Generate Questions with AI
-     */
     public function generate(Request $request)
     {
         abort_unless(Auth::user()->isTeacher(), 403, 'Unauthorized.');
 
         $request->validate([
             'module_pdf'     => 'required|mimes:pdf|max:10240',
-            'class_id'       => 'required',
+            'class_id'       => 'required|exists:classes,id',
             'question_count' => 'required|integer|min:1|max:50',
             'quiz_title'     => 'required|string',
+            'subject'        => 'required|string',
+            'published_at'   => 'required|date',
+            'deadline_at'    => 'required|date',
+            'max_attempts'   => 'nullable|integer|min:1',
         ]);
 
-        $file = $request->file('module_pdf');
-        
-        // 1. Convert the raw PDF to Base64 to send directly to Google
         try {
-            $pdfBase64 = base64_encode(file_get_contents($file->getPathname()));
+            $pdfBase64 = base64_encode(file_get_contents($request->file('module_pdf')->getPathname()));
         } catch (\Throwable $e) {
             return back()->with('error', 'Could not read the uploaded file.');
         }
@@ -132,37 +193,34 @@ class QuizController extends Controller
             return back()->with('error', 'Gemini AI service is not configured.');
         }
 
-        // 2. Send the PDF directly to Gemini (No PHP parsing needed!)
-        $aiQuestions = $this->ai->generateQuizFromPdf(
-            $pdfBase64,
-            'General', 
-            'Grade 3',
-            $request->question_count
-        );
+        $aiQuestions = $this->ai->generateQuizFromPdf($pdfBase64, $request->subject, 'Grade 3', $request->question_count);
 
         if (empty($aiQuestions)) {
-            return back()->with('error', 'Failed to generate quiz questions using Gemini AI. The AI may be busy or the PDF is too large.');
+            return back()->with('error', 'Failed to generate quiz questions using Gemini AI.');
         }
 
-        // 3. Format the questions for the view
         $generatedQuestions = array_map(function($q) {
             return [
-                'question' => $q['question_text'] ?? 'Question Text Missing',
-                'answer'   => $q['correct_answer'] ?? 'Answer Missing',
-                'options'  => $q['options'] ?? []
+                'question'   => $q['question_text'] ?? 'Question Text Missing',
+                'answer'     => $q['correct_answer'] ?? 'Answer Missing',
+                'options'    => $q['options'] ?? [],
+                'difficulty' => strtolower($q['difficulty_level'] ?? 'medium'),
             ];
         }, $aiQuestions);
 
-        $classes = Auth::user()->classes ?? Auth::user()->ownedClasses;
-        $class_id = $request->class_id;
-        $quiz_title = $request->quiz_title;
+        $user = Auth::user();
+        $classes = $user->ownedClasses;
+        $selectedClass = $classes->where('id', $request->class_id)->firstOrFail();
+        
+        $quiz_title   = $request->quiz_title;
+        $subject      = $request->subject;
+        $published_at = $request->published_at;
+        $deadline_at  = $request->deadline_at;
+        $max_attempts = $request->max_attempts ?? 1;
 
-        return view('quiz.create', compact('classes', 'generatedQuestions', 'class_id', 'quiz_title'));
+        return view('quiz.create', compact('classes', 'selectedClass', 'generatedQuestions', 'quiz_title', 'subject', 'published_at', 'deadline_at', 'max_attempts'));
     }
 
-    /**
-     * STEP 3: Save Finalized Quiz & Enforce Deadlines
-     */
     public function store(Request $request)
     {
         abort_unless(Auth::user()->isTeacher(), 403);
@@ -170,85 +228,153 @@ class QuizController extends Controller
         $request->validate([
             'class_id'     => 'required|exists:classes,id',
             'quiz_title'   => 'required|string',
+            'subject'      => 'required|string',
             'published_at' => 'required|date',
-            'deadline_at'  => 'required|date|after:published_at',
-            'questions'    => 'required|array',
+            'deadline_at'  => 'required|date',
+            'max_attempts' => 'nullable|integer|min:1',
+            'quiz_mode'    => 'required|in:manual,ai',
+            'questions'    => 'required|array|min:1',
         ]);
 
-        $topic = $this->topicForSubject('General'); 
+        $topic = Topic::firstOrCreate(
+            ['subject' => ucfirst($request->subject), 'name' => ucfirst($request->subject) . ' Adaptive Quiz'],
+            ['difficulty_level' => 'mixed', 'order_index' => 0]
+        );
 
         $quiz = Quiz::create([
             'class_id'     => $request->class_id,
             'topic_id'     => $topic->id,
-            'type'         => 'ai_generated',
+            'type'         => $request->quiz_mode === 'ai' ? 'ai_generated' : 'manual',
             'title'        => $request->quiz_title,
-            'subject'      => 'general',
+            'subject'      => strtolower($request->subject),
             'published_at' => Carbon::parse($request->published_at),
             'deadline_at'  => Carbon::parse($request->deadline_at),
+            'max_attempts' => $request->max_attempts ?? 1,
         ]);
 
         foreach ($request->questions as $q) {
             $questionModel = Question::create([
-                'topic_id'         => $quiz->topic_id,
-                'question_text'    => $q['text'],
-                'question_type'    => 'multiple_choice',
-                'difficulty_level' => 'medium',
-                'correct_answer'   => $q['answer'],
-                'options'          => [$q['answer'], 'Option B', 'Option C', 'Option D'] 
+                'topic_id'           => $quiz->topic_id,
+                'question_text'      => $q['text'],
+                'question_type'      => 'multiple_choice',
+                'difficulty_level'   => $q['difficulty'],
+                'correct_answer'     => $q['answer'],
+                'options'            => $q['options'],
+                'time_limit_seconds' => $q['time_limit'],
+                'points'             => $q['points'],
             ]);
-
             $quiz->questions()->syncWithoutDetaching([$questionModel->id]);
         }
 
-        return redirect()->route('dashboard')->with('success', 'Quiz published successfully with deadlines set!');
+        return redirect()->route('dashboard')->with('success', 'Quiz published successfully!');
     }
 
-    // ==========================================
-    // GAMIFICATION & INTERACTIVE QUIZ LOGIC
-    // ==========================================
-
-    /**
-     * Find (or create) the Topic row that represents a subject's AI-driven adaptive quiz track.[cite: 4]
-     */
-    protected function topicForSubject(string $subject): Topic
+    public function edit(Quiz $quiz)
     {
-        return Topic::firstOrCreate(
-            ['subject' => ucfirst($subject), 'name' => ucfirst($subject) . ' Adaptive Quiz'],
-            ['difficulty_level' => 'mixed', 'order_index' => 0]
-        );
+        abort_unless(Auth::user()->isTeacher(), 403);
+        abort_unless(Auth::user()->ownedClasses->contains($quiz->class_id), 403, 'You do not own this class.');
+
+        $quiz->load('questions', 'classroom');
+        return view('quiz.edit', compact('quiz'));
     }
 
-    /**
-     * Find (or create) the Quiz row representing the AI-generated adaptive quiz.[cite: 4]
-     */
-    protected function quizForSubject(string $subject, Topic $topic): Quiz
+    public function update(Request $request, Quiz $quiz)
     {
-        return Quiz::firstOrCreate(
-            ['topic_id' => $topic->id, 'type' => 'standard'],
-            ['title' => ucfirst($subject) . ' Adaptive Quiz', 'config' => ['ai_generated' => true]]
-        );
-    }
-
-    /**
-     * Start a new interactive session: pick subject, reset in-memory progress, get Q1.[cite: 4]
-     */
-    public function start(Request $request)
-    {
-        abort_unless(Auth::user()->isStudent(), 403);
-
-        if (Auth::user()->joinedClasses()->count() === 0) {
-            return response()->json(['error' => 'You need to join a class before you can take a quiz.'], 403);
-        }
+        abort_unless(Auth::user()->isTeacher(), 403);
+        abort_unless(Auth::user()->ownedClasses->contains($quiz->class_id), 403, 'You do not own this class.');
 
         $request->validate([
-            'subject' => 'required|in:math,english',
+            'quiz_title'   => 'required|string',
+            'published_at' => 'required|date',
+            'deadline_at'  => 'required|date',
+            'max_attempts' => 'nullable|integer|min:1',
+            'questions'    => 'required|array|min:1',
         ]);
 
+        $quiz->update([
+            'title'        => $request->quiz_title,
+            'published_at' => Carbon::parse($request->published_at),
+            'deadline_at'  => Carbon::parse($request->deadline_at),
+            'max_attempts' => $request->max_attempts,
+        ]);
+
+        $keptQuestionIds = [];
+
+        foreach ($request->questions as $q) {
+            if (isset($q['id'])) {
+                $question = Question::find($q['id']);
+                if ($question) {
+                    $question->update([
+                        'question_text'      => $q['text'],
+                        'difficulty_level'   => $q['difficulty'] ?? 'medium',
+                        'correct_answer'     => $q['answer'],
+                        'options'            => $q['options'],
+                        'time_limit_seconds' => $q['time_limit'],
+                        'points'             => $q['points'],
+                    ]);
+                    $keptQuestionIds[] = $question->id;
+                }
+            } else {
+                $newQuestion = Question::create([
+                    'topic_id'           => $quiz->topic_id,
+                    'question_text'      => $q['text'],
+                    'question_type'      => 'multiple_choice',
+                    'difficulty_level'   => $q['difficulty'] ?? 'medium',
+                    'correct_answer'     => $q['answer'],
+                    'options'            => $q['options'],
+                    'time_limit_seconds' => $q['time_limit'],
+                    'points'             => $q['points'],
+                ]);
+                $quiz->questions()->attach($newQuestion->id);
+                $keptQuestionIds[] = $newQuestion->id;
+            }
+        }
+
+        $existingQuestionIds = $quiz->questions->pluck('id')->toArray();
+        $questionsToDelete = array_diff($existingQuestionIds, $keptQuestionIds);
+        
+        if (!empty($questionsToDelete)) {
+            $quiz->questions()->detach($questionsToDelete);
+        }
+
+        return redirect()->route('dashboard')->with('success', 'Quiz updated successfully!');
+    }
+
+    public function destroy(Quiz $quiz)
+    {
+        abort_unless(Auth::user()->isTeacher(), 403);
+        abort_unless(Auth::user()->ownedClasses->contains($quiz->class_id), 403, 'You do not own this class.');
+
+        $quiz->questions()->detach();
+        $quiz->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Quiz deleted successfully!');
+    }
+
+    public function start(Request $request)
+    {
+        $request->validate(['quiz_id' => 'required|exists:quizzes,id']);
+        $quiz = Quiz::with('questions')->findOrFail($request->quiz_id);
+        $user = Auth::user();
+
+        abort_unless($user->isStudent(), 403);
+
+        $attemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
+            ->where('student_id', $user->id)
+            ->count();
+
+        if ($quiz->max_attempts && $attemptsCount >= $quiz->max_attempts) {
+            return response()->json([
+                'error' => 'This quiz is closed. You have used all available attempts.'
+            ], 403);
+        }
+
         $progress = [
-            'subject'        => $request->subject,
+            'quiz_id'        => $quiz->id,
+            'subject'        => $quiz->subject,
             'level'          => 'easy',
             'index'          => 0,
-            'total'          => 5,
+            'total'          => $quiz->questions->count(),
             'score'          => 0,
             'current_streak' => 0,
             'max_streak'     => 0,
@@ -259,8 +385,7 @@ class QuizController extends Controller
         ];
 
         Session::put('quiz_progress', $progress);
-
-        $question = $this->generateQuestion($progress['subject'], $progress['level'], $progress['asked_ids']);
+        $question = $this->generateQuestion($progress);
 
         if (!empty($question['id'])) {
             $progress['asked_ids'][] = $question['id'];
@@ -277,13 +402,10 @@ class QuizController extends Controller
         ]);
     }
 
-    /**
-     * Submit an answer for the current question, evaluate gamification stats, and proceed or finish attempt.[cite: 4]
-     */
     public function submitAnswer(Request $request)
     {
         $request->validate([
-            'question_id'        => 'nullable|integer',
+            'question_id'        => 'required|integer',
             'selected_index'     => 'required|integer',
             'question_text'      => 'required|string',
             'correct_index'      => 'required|integer',
@@ -299,43 +421,37 @@ class QuizController extends Controller
 
         $isCorrect = $request->selected_index === $request->correct_index;
         $timeTaken = $request->input('time_taken_seconds', 0);
-
-        $baseXp = 100;
+        $questionModel = Question::find($request->question_id);
+        
+        $baseXp = $questionModel->points ?? 100;
+        $questionTimeLimit = $questionModel->time_limit_seconds ?? 30;
         $earnedXp = 0;
         $multiplier = 1.0;
 
         if ($isCorrect) {
             $progress['score']++;
-            $progress['current_streak'] = ($progress['current_streak'] ?? 0) + 1;
+            $progress['current_streak']++;
 
-            if ($progress['current_streak'] > ($progress['max_streak'] ?? 0)) {
+            if ($progress['current_streak'] > $progress['max_streak']) {
                 $progress['max_streak'] = $progress['current_streak'];
             }
-
             if ($progress['current_streak'] >= 5) {
                 $multiplier = 2.0;
             } elseif ($progress['current_streak'] >= 3) {
                 $multiplier = 1.5;
             }
 
-            $timeBonus = max(0, (15 - $timeTaken) * 5);
+            $timeBonus = max(0, ($questionTimeLimit - $timeTaken) * 2);
             $earnedXp = (int) round(($baseXp + $timeBonus) * $multiplier);
-            $progress['total_xp'] = ($progress['total_xp'] ?? 0) + $earnedXp;
-
-            $progress['level'] = $this->stepUp($progress['level']);
+            $progress['total_xp'] += $earnedXp;
         } else {
             $progress['current_streak'] = 0;
-            $progress['level'] = $this->stepDown($progress['level']);
         }
 
         $progress['log'][] = [
             'question_id'        => $request->question_id,
-            'question'           => $request->question_text,
-            'options'            => $request->options,
-            'correct_index'      => $request->correct_index,
             'selected'           => $request->selected_index,
             'correct'            => $isCorrect,
-            'level'              => $progress['level'],
             'time_taken_seconds' => $timeTaken,
             'xp_earned'          => $earnedXp,
             'multiplier_applied' => $multiplier,
@@ -345,16 +461,13 @@ class QuizController extends Controller
         $finished = $progress['index'] >= $progress['total'];
 
         if ($finished) {
-            $topic = $this->topicForSubject($progress['subject']);
-            $quiz  = $this->quizForSubject($progress['subject'], $topic);
-
+            $quiz = Quiz::find($progress['quiz_id']);
             $startedAt = isset($progress['started_at']) ? Carbon::parse($progress['started_at']) : now();
             $totalTimeTaken = (int) round(abs($startedAt->diffInSeconds(now())));
 
             $attempt = QuizAttempt::create([
                 'student_id'         => Auth::id(),
                 'quiz_id'            => $quiz->id,
-                'weakest_topic_id'   => !$isCorrect ? $topic->id : null,
                 'score'              => $progress['score'],
                 'total_questions'    => $progress['total'],
                 'time_taken_seconds' => $totalTimeTaken,
@@ -371,30 +484,9 @@ class QuizController extends Controller
             }
 
             foreach ($progress['log'] as $entry) {
-                $options = $entry['options'] ?? null;
-                $correctAnswer = ($options && isset($entry['correct_index']))
-                    ? ($options[$entry['correct_index']] ?? null)
-                    : null;
-
-                $question = $entry['question_id'] ? Question::find($entry['question_id']) : null;
-
-                if (!$question) {
-                    $question = Question::create([
-                        'topic_id'         => $topic->id,
-                        'question_text'    => $entry['question'],
-                        'question_type'    => 'multiple_choice',
-                        'difficulty_level' => $entry['level'],
-                        'correct_answer'   => $correctAnswer,
-                        'options'          => $options,
-                    ]);
-                }
-
-                $quiz->questions()->syncWithoutDetaching([$question->id]);
-
                 QuestionResponse::create([
                     'quiz_attempt_id'    => $attempt->id,
-                    'question_id'        => $question->id,
-                    'student_answer'     => ($options && isset($entry['selected'])) ? ($options[$entry['selected']] ?? null) : null,
+                    'question_id'        => $entry['question_id'],
                     'is_correct'         => $entry['correct'],
                     'time_taken_seconds' => $entry['time_taken_seconds'] ?? null,
                     'xp_earned'          => $entry['xp_earned'] ?? 0,
@@ -409,7 +501,7 @@ class QuizController extends Controller
                 'summary'  => [
                     'score'      => $progress['score'],
                     'total'      => $progress['total'],
-                    'accuracy'   => $attempt->accuracy,
+                    'accuracy'   => $progress['total'] > 0 ? ($progress['score'] / $progress['total']) * 100 : 0,
                     'level'      => $progress['level'],
                     'max_streak' => $progress['max_streak'],
                     'total_xp'   => $progress['total_xp'],
@@ -418,8 +510,7 @@ class QuizController extends Controller
         }
 
         Session::put('quiz_progress', $progress);
-
-        $question = $this->generateQuestion($progress['subject'], $progress['level'], $progress['asked_ids']);
+        $question = $this->generateQuestion($progress);
 
         if (!empty($question['id'])) {
             $progress['asked_ids'][] = $question['id'];
@@ -432,7 +523,6 @@ class QuizController extends Controller
             'question'        => $question,
             'question_number' => $progress['index'] + 1,
             'total_questions' => $progress['total'],
-            'level'           => $progress['level'],
             'current_streak'  => $progress['current_streak'],
             'max_streak'      => $progress['max_streak'],
             'earned_xp'       => $earnedXp,
@@ -441,25 +531,17 @@ class QuizController extends Controller
         ]);
     }
 
-    /**
-     * Pull one question from the static question bank.[cite: 4]
-     */
-    protected function generateQuestion(string $subject, string $level, array $excludeIds = []): array
+    protected function generateQuestion(array $progress): array
     {
-        $topic = $this->topicForSubject($subject);
-
-        $query = Question::where('topic_id', $topic->id)->where('difficulty_level', $level);
-        if (!empty($excludeIds)) {
-            $query->whereNotIn('id', $excludeIds);
-        }
-        $question = $query->inRandomOrder()->first();
+        $quiz = Quiz::with('questions')->find($progress['quiz_id']);
+        
+        $question = $quiz->questions()
+            ->whereNotIn('questions.id', $progress['asked_ids'])
+            ->inRandomOrder()
+            ->first();
 
         if (!$question) {
-            $query = Question::where('topic_id', $topic->id);
-            if (!empty($excludeIds)) {
-                $query->whereNotIn('id', $excludeIds);
-            }
-            $question = $query->inRandomOrder()->first();
+            $question = $quiz->questions()->inRandomOrder()->first();
         }
 
         if ($question) {
@@ -471,63 +553,11 @@ class QuizController extends Controller
                 'text'          => $question->question_text,
                 'options'       => $options,
                 'correct_index' => $correctIndex !== false ? $correctIndex : 0,
+                'time_limit'    => $question->time_limit_seconds ?? 30,
+                'points'        => $question->points ?? 100,
             ];
         }
 
-        if ($this->ai) {
-            $subjectLabel = $subject === 'math' ? 'elementary Math' : 'elementary English';
-
-            $userPrompt = "Generate one {$level}-difficulty {$subjectLabel} multiple-choice question.\n" .
-                "Return ONLY a JSON object with this exact structure:\n" .
-                "{\n" .
-                "  \"text\": \"Question string\",\n" .
-                "  \"options\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n" .
-                "  \"correct_index\": 1\n" .
-                "}";
-
-            try {
-                $questions = $this->ai->generateQuizFromText($userPrompt, ucfirst($subject), 'Grade 3', 1);
-
-                if (!empty($questions[0])) {
-                    $item = $questions[0];
-                    $options = $item['options'] ?? ['3', '4', '5', '6'];
-                    $correctIndex = array_search($item['correct_answer'] ?? '', $options, true);
-
-                    return [
-                        'id'            => null,
-                        'text'          => $item['question_text'] ?? 'What is 2 + 2?',
-                        'options'       => $options,
-                        'correct_index' => $correctIndex !== false ? $correctIndex : 1,
-                    ];
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Gemini live question generation failed: ' . $e->getMessage());
-            }
-        }
-
-        return [
-            'id'            => null,
-            'text'          => 'What is 2 + 2?',
-            'options'       => ['3', '4', '5', '6'],
-            'correct_index' => 1,
-        ];
-    }
-
-    protected function stepUp(string $level): string
-    {
-        return match ($level) {
-            'easy'   => 'medium',
-            'medium' => 'hard',
-            default  => 'hard',
-        };
-    }
-
-    protected function stepDown(string $level): string
-    {
-        return match ($level) {
-            'hard'   => 'medium',
-            'medium' => 'easy',
-            default  => 'easy',
-        };
+        return [];
     }
 }

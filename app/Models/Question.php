@@ -13,6 +13,8 @@ class Question extends Model
         'difficulty_level',
         'correct_answer',
         'options',
+        'time_limit_seconds',
+        'points'
     ];
 
     protected function casts(): array
