@@ -47,6 +47,24 @@ class QuizController extends Controller
         return $user && ($user->isTeacher() || $user->role === 'admin');
     }
 
+    protected function resolveModuleDisk(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $primary = config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
+        if (Storage::disk($primary)->exists($path)) {
+            return $primary;
+        }
+
+        if ($primary !== 'public' && Storage::disk('public')->exists($path)) {
+            return 'public';
+        }
+
+        return null;
+    }
+
     protected function hasQuestionsQuizIdColumn(): bool
     {
         return Cache::rememberForever('schema_questions_has_quiz_id', fn () => Schema::hasColumn('questions', 'quiz_id'));
@@ -313,6 +331,7 @@ class QuizController extends Controller
         $classes = $user->role === 'admin' ? Classroom::all() : $user->ownedClasses;
         $selectedClass = $classes->firstWhere('id', $request->class_id) ?? $classes->first();
         $preselectedModule = null;
+        $tempModuleFile = null;
 
         try {
             if ($request->hasFile('module_pdf')) {
@@ -323,11 +342,22 @@ class QuizController extends Controller
                 $preselectedModule = Module::findOrFail($request->module_id);
                 abort_unless($classes->contains('id', $preselectedModule->class_id), 403);
 
-                $filePath = Storage::disk('public')->path($preselectedModule->file_path);
+                $disk = $this->resolveModuleDisk($preselectedModule->file_path);
+                if (!$disk) {
+                    throw new Exception('The selected class file could not be found on the server.');
+                }
+
                 $originalName = $preselectedModule->file_name;
 
-                if (!file_exists($filePath)) {
-                    throw new Exception('The selected class file could not be found on the server.');
+                if ($disk === 'public') {
+                    $filePath = Storage::disk('public')->path($preselectedModule->file_path);
+                } else {
+                    $ext = strtolower($preselectedModule->file_type ?: pathinfo((string) $originalName, PATHINFO_EXTENSION) ?: 'pdf');
+                    $tempBase = tempnam(sys_get_temp_dir(), 'bb_quiz_');
+                    $tempModuleFile = $tempBase . '.' . $ext;
+                    @unlink($tempBase);
+                    file_put_contents($tempModuleFile, Storage::disk($disk)->get($preselectedModule->file_path));
+                    $filePath = $tempModuleFile;
                 }
             }
 
@@ -413,6 +443,10 @@ class QuizController extends Controller
             }
 
             return back()->withInput()->withErrors(['module_pdf' => 'Failed to generate quiz: ' . $e->getMessage()]);
+        } finally {
+            if ($tempModuleFile && file_exists($tempModuleFile)) {
+                @unlink($tempModuleFile);
+            }
         }
     }
 

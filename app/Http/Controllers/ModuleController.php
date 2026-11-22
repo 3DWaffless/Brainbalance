@@ -23,6 +23,29 @@ class ModuleController extends Controller
         }
     }
 
+    protected function activeDisk(): string
+    {
+        return config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
+    }
+
+    protected function resolveDiskForPath(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $primary = $this->activeDisk();
+        if (Storage::disk($primary)->exists($path)) {
+            return $primary;
+        }
+
+        if ($primary !== 'public' && Storage::disk('public')->exists($path)) {
+            return 'public';
+        }
+
+        return null;
+    }
+
     public function index()
     {
         $user = Auth::user();
@@ -56,7 +79,7 @@ class ModuleController extends Controller
         }
 
         $file = $request->file('file');
-        $filePath = $file->store('modules', 'public');
+        $filePath = $file->store('modules', $this->activeDisk());
 
         Module::create([
             'class_id'  => $request->class_id,
@@ -104,16 +127,12 @@ class ModuleController extends Controller
     {
         $this->authorizeModuleAccess($module);
 
-        $fullPath = Storage::disk('public')->path($module->file_path);
-
-        if (!file_exists($fullPath)) {
+        $disk = $this->resolveDiskForPath($module->file_path);
+        if (!$disk) {
             abort(404, 'Module file not found on server.');
         }
 
-        $mimeType = Storage::disk('public')->mimeType($module->file_path) ?? 'application/octet-stream';
-
-        return response()->file($fullPath, [
-            'Content-Type'        => $mimeType,
+        return Storage::disk($disk)->response($module->file_path, $module->file_name, [
             'Content-Disposition' => 'inline; filename="' . $module->file_name . '"',
         ]);
     }
@@ -122,7 +141,12 @@ class ModuleController extends Controller
     {
         $this->authorizeModuleAccess($module);
 
-        return Storage::disk('public')->download($module->file_path, $module->file_name);
+        $disk = $this->resolveDiskForPath($module->file_path);
+        if (!$disk) {
+            abort(404, 'Module file not found on server.');
+        }
+
+        return Storage::disk($disk)->download($module->file_path, $module->file_name);
     }
 
     public function destroy(Module $module)
@@ -134,7 +158,11 @@ class ModuleController extends Controller
             abort_unless($user->ownedClasses->contains($module->class_id), 403);
         }
 
-        Storage::disk('public')->delete($module->file_path);
+        $disk = $this->resolveDiskForPath($module->file_path);
+        if ($disk) {
+            Storage::disk($disk)->delete($module->file_path);
+        }
+
         $module->delete();
 
         return back()->with('success', 'Module deleted successfully!');
@@ -145,6 +173,8 @@ class ModuleController extends Controller
      */
     public function aiChat(Request $request, Module $module)
     {
+        $tempFile = null;
+
         try {
             $user = Auth::user();
 
@@ -171,7 +201,21 @@ class ModuleController extends Controller
                 $this->ai = app(GroqService::class);
             }
 
-            $fullPath = Storage::disk('public')->path($module->file_path);
+            $disk = $this->resolveDiskForPath($module->file_path);
+            if (!$disk) {
+                return response()->json(['reply' => '⚠️ File not found on storage server.'], 200);
+            }
+
+            if ($disk === 'public') {
+                $fullPath = Storage::disk('public')->path($module->file_path);
+            } else {
+                $ext = strtolower($module->file_type ?: pathinfo((string) $module->file_name, PATHINFO_EXTENSION) ?: 'pdf');
+                $tempBase = tempnam(sys_get_temp_dir(), 'bb_mod_');
+                $tempFile = $tempBase . '.' . $ext;
+                @unlink($tempBase);
+                file_put_contents($tempFile, Storage::disk($disk)->get($module->file_path));
+                $fullPath = $tempFile;
+            }
 
             // Recent chat turns so follow-up questions ("explain that again") work.
             $history = collect($request->input('history', []))
@@ -200,6 +244,10 @@ class ModuleController extends Controller
             return response()->json([
                 'reply' => "⚠️ AI Error: " . $e->getMessage()
             ], 200);
+        } finally {
+            if ($tempFile && file_exists($tempFile)) {
+                @unlink($tempFile);
+            }
         }
     }
 }
