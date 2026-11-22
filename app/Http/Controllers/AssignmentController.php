@@ -11,6 +11,42 @@ use Illuminate\Support\Facades\Storage;
 
 class AssignmentController extends Controller
 {
+    protected function activeDisk(): string
+    {
+        return config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
+    }
+
+    protected function resolveDiskForPath(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $primary = $this->activeDisk();
+
+        try {
+            if (Storage::disk($primary)->fileExists($path)) {
+                return $primary;
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "Storage check failed on [{$primary}] for [{$path}]: " . ($e->getPrevious()?->getMessage() ?? $e->getMessage())
+            );
+        }
+
+        if ($primary !== 'public') {
+            try {
+                if (Storage::disk('public')->fileExists($path)) {
+                    return 'public';
+                }
+            } catch (\Throwable $e) {
+                // Ignore local fallback check errors
+            }
+        }
+
+        return null;
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -111,11 +147,12 @@ class AssignmentController extends Controller
         $fileName = $existing?->file_name;
 
         if ($request->hasFile('file')) {
-            if ($filePath) {
-                Storage::disk('public')->delete($filePath);
+            $oldDisk = $this->resolveDiskForPath($filePath);
+            if ($oldDisk) {
+                Storage::disk($oldDisk)->delete($filePath);
             }
             $file = $request->file('file');
-            $filePath = $file->store('assignment_submissions', 'public');
+            $filePath = $file->store('assignment_submissions', $this->activeDisk());
             $fileName = $file->getClientOriginalName();
         }
 
@@ -167,6 +204,9 @@ class AssignmentController extends Controller
 
         abort_unless($canAccess, 403);
 
-        return Storage::disk('public')->download($submission->file_path, $submission->file_name ?? 'submission');
+        $disk = $this->resolveDiskForPath($submission->file_path);
+        abort_unless($disk, 404);
+
+        return Storage::disk($disk)->download($submission->file_path, $submission->file_name ?? 'submission');
     }
 }

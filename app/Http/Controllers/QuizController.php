@@ -54,12 +54,25 @@ class QuizController extends Controller
         }
 
         $primary = config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
-        if (Storage::disk($primary)->exists($path)) {
-            return $primary;
+
+        try {
+            if (Storage::disk($primary)->fileExists($path)) {
+                return $primary;
+            }
+        } catch (\Throwable $e) {
+            Log::warning(
+                "Storage check failed on [{$primary}] for [{$path}]: " . ($e->getPrevious()?->getMessage() ?? $e->getMessage())
+            );
         }
 
-        if ($primary !== 'public' && Storage::disk('public')->exists($path)) {
-            return 'public';
+        if ($primary !== 'public') {
+            try {
+                if (Storage::disk('public')->fileExists($path)) {
+                    return 'public';
+                }
+            } catch (\Throwable $e) {
+                // Ignore local fallback check errors
+            }
         }
 
         return null;

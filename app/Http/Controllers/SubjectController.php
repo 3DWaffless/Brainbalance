@@ -13,24 +13,52 @@ use Illuminate\Support\Facades\Storage;
 
 class SubjectController extends Controller
 {
+    protected function activeDisk(): string
+    {
+        return config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
+    }
+
+    protected function resolveDiskForPath(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $primary = $this->activeDisk();
+
+        try {
+            if (Storage::disk($primary)->fileExists($path)) {
+                return $primary;
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "Storage check failed on [{$primary}] for [{$path}]: " . ($e->getPrevious()?->getMessage() ?? $e->getMessage())
+            );
+        }
+
+        if ($primary !== 'public') {
+            try {
+                if (Storage::disk('public')->fileExists($path)) {
+                    return 'public';
+                }
+            } catch (\Throwable $e) {
+                // Ignore local fallback check errors
+            }
+        }
+
+        return null;
+    }
+
     public function index()
     {
         $user = Auth::user();
 
         if ($user->role === 'admin') {
-            $classes = Classroom::withCount('students')
-                ->latest()
-                ->get();
+            $classes = Classroom::withCount('students')->latest()->get();
         } elseif ($user->isTeacher()) {
-            $classes = Classroom::where('teacher_id', $user->id)
-                ->withCount('students')
-                ->latest()
-                ->get();
+            $classes = Classroom::where('teacher_id', $user->id)->withCount('students')->latest()->get();
         } else {
-            $classes = $user->joinedClasses()
-                ->withCount('students')
-                ->latest()
-                ->get();
+            $classes = $user->joinedClasses()->withCount('students')->latest()->get();
         }
 
         return view('subjects.index', compact('classes'));
@@ -118,6 +146,8 @@ class SubjectController extends Controller
             return back()->withErrors(['video_url' => 'Please upload a video file or paste a video link.'])->withInput();
         }
 
+        $disk = $this->activeDisk();
+
         $data = [
             'class_id'   => $classroom->id,
             'teacher_id' => $user->id,
@@ -126,10 +156,9 @@ class SubjectController extends Controller
             'content'    => trim((string) ($validated['content'] ?? '')),
         ];
 
-        // Handle File / Material Upload (also syncs to Module so AI Quiz Generator & PDF Reader see it)
         if ($type === 'file' && $request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('modules', 'public');
+            $path = $file->store('modules', $disk);
             $ext  = strtolower($file->getClientOriginalExtension() ?: 'file');
 
             $module = Module::create([
@@ -148,11 +177,10 @@ class SubjectController extends Controller
             $data['module_id'] = $module->id;
         }
 
-        // Handle Video Upload or Video URL
         if ($type === 'video') {
             if ($request->hasFile('video_file')) {
                 $video = $request->file('video_file');
-                $path  = $video->store('modules', 'public');
+                $path  = $video->store('modules', $disk);
                 $ext   = strtolower($video->getClientOriginalExtension() ?: 'mp4');
 
                 $module = Module::create([
@@ -174,7 +202,6 @@ class SubjectController extends Controller
             }
         }
 
-        // Handle Quiz Post (auto-publishes if it was still a draft)
         if ($type === 'quiz') {
             $quiz = Quiz::where('class_id', $classroom->id)->findOrFail($validated['quiz_id']);
             if (!$quiz->isPublished()) {
@@ -186,14 +213,13 @@ class SubjectController extends Controller
             }
         }
 
-        // Handle Assignment Post
         if ($type === 'assignment') {
             $data['due_at'] = $validated['due_at'];
             $data['points'] = $validated['points'] ?? 100;
 
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
-                $path = $file->store('assignments', 'public');
+                $path = $file->store('assignments', $disk);
                 $data['file_path'] = $path;
                 $data['file_name'] = $file->getClientOriginalName();
                 $data['file_type'] = strtolower($file->getClientOriginalExtension() ?: 'file');
@@ -218,15 +244,12 @@ class SubjectController extends Controller
     {
         $this->authorizeAnnouncementAccess($announcement);
 
-        abort_unless($announcement->file_path, 404);
-        $fullPath = Storage::disk('public')->path($announcement->file_path);
-        abort_unless(file_exists($fullPath), 404);
+        $disk = $this->resolveDiskForPath($announcement->file_path);
+        abort_unless($disk, 404);
 
-        $mimeType = Storage::disk('public')->mimeType($announcement->file_path) ?? 'application/octet-stream';
-
-        return response()->file($fullPath, [
-            'Content-Type'        => $mimeType,
-            'Content-Disposition' => 'inline; filename="' . ($announcement->file_name ?? 'attachment') . '"',
+        $fileName = $announcement->file_name ?? 'attachment';
+        return Storage::disk($disk)->response($announcement->file_path, $fileName, [
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"',
         ]);
     }
 
@@ -234,8 +257,10 @@ class SubjectController extends Controller
     {
         $this->authorizeAnnouncementAccess($announcement);
 
-        abort_unless($announcement->file_path, 404);
-        return Storage::disk('public')->download($announcement->file_path, $announcement->file_name ?? 'attachment');
+        $disk = $this->resolveDiskForPath($announcement->file_path);
+        abort_unless($disk, 404);
+
+        return Storage::disk($disk)->download($announcement->file_path, $announcement->file_name ?? 'attachment');
     }
 
     public function destroyAnnouncement(Announcement $announcement)
@@ -246,13 +271,17 @@ class SubjectController extends Controller
         if ($announcement->module_id) {
             $module = Module::find($announcement->module_id);
             if ($module) {
-                if ($module->file_path) {
-                    Storage::disk('public')->delete($module->file_path);
+                $modDisk = $this->resolveDiskForPath($module->file_path);
+                if ($modDisk) {
+                    Storage::disk($modDisk)->delete($module->file_path);
                 }
                 $module->delete();
             }
         } elseif ($announcement->file_path) {
-            Storage::disk('public')->delete($announcement->file_path);
+            $attDisk = $this->resolveDiskForPath($announcement->file_path);
+            if ($attDisk) {
+                Storage::disk($attDisk)->delete($announcement->file_path);
+            }
         }
 
         $announcement->delete();
