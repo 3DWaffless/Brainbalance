@@ -1,280 +1,946 @@
+{{-- FILE: resources/views/quiz/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Create Quiz - BrainBalance')
+@section('title', (isset($editingQuiz) ? 'Edit Quiz' : 'Create Quiz') . ' - ' . config('app.name', 'BrainBalance'))
 
 @push('styles')
 <style>
-    .mode-tabs { 
-        display: flex; 
-        gap: 10px; 
-        margin-bottom: 20px; 
-        background: #FFF8F0; 
-        padding: 6px; 
-        border-radius: 12px; 
-        border: 2px solid #FFE4C4; 
+    :root {
+        --bb-blue: #0066D6;
+        --bb-blue-deep: #004FA8;
+        --bb-cyan: #1DC4DF;
+        --bb-green: #68CC18;
+        --bb-green-deep: #3E8708;
+        --bb-orange: #FF8400;
+        --bb-orange-deep: #D96B00;
+        --bb-ink: #0D2B4E;
+        --bb-muted: #4A688A;
+        --bb-surface: #F5FAFF;
+        --bb-border: #C7E0FF;
+        --bb-spectrum: linear-gradient(90deg, #0066D6 0%, #1DC4DF 33%, #68CC18 68%, #FF8400 100%);
     }
-    .mode-btn { 
-        flex: 1; 
-        padding: 12px; 
-        text-align: center; 
-        font-weight: 900; 
-        font-size: 14px; 
-        border-radius: 8px; 
-        cursor: pointer; 
-        transition: all 0.2s; 
-        color: #888; 
+
+    .bb-builder-page {
+        position: relative;
     }
-    .mode-btn.active { 
-        background: #FF6B6B; 
-        color: #fff; 
-        box-shadow: 0 4px 10px rgba(255,107,107,0.2); 
+
+    .bb-spectrum-strip {
+        height: 6px;
+        width: 100%;
+        background: var(--bb-spectrum);
     }
-    .q-block { 
-        background: #FFF8F0; 
-        border: 2px solid #FFE4C4; 
-        border-radius: 14px; 
-        padding: 20px; 
-        margin-bottom: 16px; 
-        position: relative; 
+
+    /* Hero / Header Banner matching Landing Page & Dashboard */
+    .bb-hero-banner {
+        background: #FFFFFF;
+        border: 3px solid var(--bb-border);
+        border-radius: 26px;
+        box-shadow: 0 6px 0 var(--bb-border);
+        overflow: hidden;
+        margin-bottom: 24px;
     }
-    .q-block-title { 
-        font-size: 15px; 
-        font-weight: 900; 
-        color: #2D2D2D; 
-        margin-bottom: 12px; 
-        border-bottom: 2px dashed #FFE4C4; 
-        padding-bottom: 8px; 
+
+    .bb-hero-inner {
+        padding: 22px 26px;
+        background:
+            radial-gradient(circle at 95% 15%, rgba(29, 196, 223, 0.12), transparent 40%),
+            radial-gradient(circle at 5% 90%, rgba(104, 204, 24, 0.10), transparent 40%),
+            #FFFFFF;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
     }
-    .remove-q-btn { 
-        position: absolute; 
-        top: 16px; 
-        right: 16px; 
-        color: #e74c3c; 
-        font-size: 12px; 
-        font-weight: 800; 
-        cursor: pointer; 
-        border: none; 
-        background: #F8D7DA; 
-        padding: 4px 8px; 
-        border-radius: 6px; 
+
+    .bb-hero-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 13px;
+        border-radius: 9999px;
+        background: #EBF5FF;
+        border: 2px solid #93C5FD;
+        color: var(--bb-blue);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: 6px;
+    }
+
+    .bb-hero-pill.draft-pill {
+        background: #FFF7ED;
+        border-color: #FDBA74;
+        color: #C2410C;
+    }
+
+    .create-quiz-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    @media (max-width: 992px) {
+        .create-quiz-wrapper {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .card-box {
+        background: #FFFFFF;
+        border-radius: 26px;
+        border: 3px solid var(--bb-border);
+        box-shadow: 0 6px 0 var(--bb-border);
+        overflow: hidden;
+    }
+
+    .card-box-body {
+        padding: 26px;
+    }
+
+    .class-banner {
+        background: linear-gradient(135deg, #EBF5FF 0%, #F5FAFF 100%);
+        border: 2.5px solid var(--bb-border);
+        border-radius: 20px;
+        padding: 16px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 0 #E0EEFF;
+    }
+
+    .class-title {
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--bb-ink);
+    }
+
+    .class-code-badge {
+        background: #FFFFFF;
+        color: var(--bb-blue);
+        font-weight: 900;
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        border: 2px solid #93C5FD;
+        box-shadow: 0 3px 0 #DBEAFE;
+    }
+
+    .form-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+        .form-grid-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .form-label {
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--bb-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 15px;
+        border-radius: 16px;
+        border: 2.5px solid var(--bb-border);
+        background: var(--bb-surface);
+        font-size: 13.5px;
+        font-weight: 800;
+        color: var(--bb-ink);
+        outline: none;
+        box-sizing: border-box;
+        transition: all 0.18s ease;
+    }
+
+    .form-control:focus {
+        border-color: var(--bb-blue);
+        background: #FFFFFF;
+        box-shadow: 0 0 0 4px rgba(0, 102, 214, 0.14);
+    }
+
+    .file-dropzone {
+        border: 3px dashed #38BDF8;
+        background: linear-gradient(180deg, #F5FAFF 0%, #EBF5FF 100%);
+        border-radius: 20px;
+        padding: 22px 18px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .file-dropzone:hover {
+        border-color: var(--bb-blue);
+        transform: translateY(-1px);
+    }
+
+    .error-banner {
+        background: #FEF2F2;
+        color: #DC2626;
+        border: 2.5px solid #FECACA;
+        border-radius: 16px;
+        padding: 12px 16px;
+        font-size: 12.5px;
+        font-weight: 800;
+        margin-top: 6px;
+        box-shadow: 0 4px 0 #FEE2E2;
+    }
+
+    .notice-banner {
+        background: #FFF7ED;
+        color: #9A3412;
+        border: 2.5px solid #FDBA74;
+        border-radius: 16px;
+        padding: 12px 16px;
+        font-size: 12.5px;
+        font-weight: 800;
+        margin-bottom: 18px;
+        box-shadow: 0 4px 0 #FED7AA;
+    }
+
+    /* Tactile 3D Push Buttons matching Landing Page & Dashboard */
+    .btn-submit {
+        background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);
+        color: #FFFFFF;
+        border: 2px solid var(--bb-blue-deep);
+        padding: 13px 24px;
+        border-radius: 18px;
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 5px 0 var(--bb-blue-deep);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+
+    .btn-submit:hover {
+        filter: brightness(1.04);
+        transform: translateY(-2px);
+    }
+
+    .btn-submit:active {
+        transform: translateY(3px);
+        box-shadow: 0 2px 0 var(--bb-blue-deep);
+    }
+
+    .btn-submit:disabled {
+        background: #CBD5E1;
+        border-color: #94A3B8;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .btn-publish-green {
+        background: linear-gradient(135deg, #68CC18 0%, #52B00E 100%);
+        border-color: var(--bb-green-deep);
+        box-shadow: 0 5px 0 var(--bb-green-deep);
+    }
+
+    .btn-publish-green:active {
+        box-shadow: 0 2px 0 var(--bb-green-deep);
+    }
+
+    .btn-draft-tactile {
+        background: #FFFFFF;
+        color: var(--bb-blue);
+        border: 2.5px solid #93C5FD;
+        padding: 13px 22px;
+        border-radius: 18px;
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 5px 0 #BFDBFE;
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .btn-draft-tactile:hover {
+        background: #EBF5FF;
+        transform: translateY(-2px);
+    }
+
+    .btn-draft-tactile:active {
+        transform: translateY(3px);
+        box-shadow: 0 2px 0 #BFDBFE;
+    }
+
+    .btn-ai-cyan {
+        background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);
+        color: #FFFFFF;
+        border: 2.5px solid var(--bb-blue-deep);
+        padding: 10px 18px;
+        border-radius: 16px;
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 0 var(--bb-blue-deep);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .btn-ai-cyan:hover {
+        transform: translateY(-2px);
+    }
+
+    .btn-ai-cyan:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px 0 var(--bb-blue-deep);
+    }
+
+    .btn-bank-orange {
+        background: linear-gradient(135deg, #FF8400 0%, #FFA31A 100%);
+        color: #FFFFFF;
+        border: 2.5px solid var(--bb-orange-deep);
+        padding: 10px 18px;
+        border-radius: 16px;
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 0 var(--bb-orange-deep);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .btn-bank-orange:hover {
+        transform: translateY(-2px);
+    }
+
+    .btn-bank-orange:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px 0 var(--bb-orange-deep);
+    }
+
+    .btn-back-tactile {
+        background: #FFFFFF;
+        color: var(--bb-ink);
+        border: 2.5px solid var(--bb-border);
+        padding: 10px 16px;
+        border-radius: 16px;
+        font-size: 12.5px;
+        font-weight: 900;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 0 var(--bb-border);
+        transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .btn-back-tactile:hover {
+        border-color: var(--bb-blue);
+        color: var(--bb-blue);
+        transform: translateY(-2px);
+    }
+
+    .type-pill-btn {
+        padding: 7px 12px;
+        border-radius: 13px;
+        font-size: 11.5px;
+        font-weight: 900;
+        border: 2px solid var(--bb-border);
+        background: #FFFFFF;
+        color: var(--bb-muted);
+        cursor: pointer;
+        transition: all 0.14s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        box-shadow: 0 3px 0 #E0EEFF;
+    }
+
+    .type-pill-btn:hover {
+        border-color: var(--bb-cyan);
+        color: var(--bb-blue);
+        transform: translateY(-1px);
+    }
+
+    .type-pill-btn.active {
+        background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);
+        border-color: var(--bb-blue-deep);
+        color: #FFFFFF;
+        box-shadow: 0 3px 0 var(--bb-blue-deep);
+    }
+
+    .question-card {
+        background: #FFFFFF;
+        border: 3px solid var(--bb-border);
+        border-radius: 24px;
+        padding: 22px;
+        margin-bottom: 20px;
+        position: relative;
+        box-shadow: 0 6px 0 var(--bb-border);
+        transition: border-color 0.18s ease;
+    }
+
+    .question-card:focus-within {
+        border-color: #60A5FA;
+    }
+
+    .btn-remove-question {
+        background: #FEF2F2;
+        color: #DC2626;
+        border: 2px solid #FECACA;
+        border-radius: 12px;
+        padding: 5px 12px;
+        font-size: 11.5px;
+        font-weight: 900;
+        cursor: pointer;
+        box-shadow: 0 2px 0 #FECACA;
+    }
+
+    .btn-remove-question:hover {
+        background: #FEE2E2;
+    }
+
+    /* Dashboard-style Guide Sidebar Card */
+    .sidebar-card {
+        background: #FFFFFF;
+        color: var(--bb-ink);
+        border-radius: 26px;
+        border: 3px solid var(--bb-border);
+        box-shadow: 0 6px 0 var(--bb-border);
+        overflow: hidden;
+    }
+
+    .sidebar-header {
+        background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);
+        color: #FFFFFF;
+        padding: 18px 22px;
+        border-bottom: 3px solid var(--bb-blue-deep);
+    }
+
+    .sidebar-title {
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .sidebar-body {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .sidebar-item {
+        font-size: 12.5px;
+        font-weight: 700;
+        line-height: 1.55;
+        color: var(--bb-ink);
+        background: var(--bb-surface);
+        border: 2px solid var(--bb-border);
+        padding: 12px 14px;
+        border-radius: 16px;
+    }
+
+    .sidebar-item.accent-blue {
+        background: #EBF5FF;
+        border-color: #93C5FD;
+    }
+
+    .sidebar-item.accent-orange {
+        background: #FFF7ED;
+        border-color: #FED7AA;
+    }
+
+    .sidebar-item.accent-green {
+        background: #F4FCEB;
+        border-color: #BEF264;
+    }
+
+    .sidebar-item.accent-amber {
+        background: #FEFCE8;
+        border-color: #FDE047;
+    }
+
+    /* Slide-over Drawers (Question Bank & AI Generator share identical formatting) */
+    .bank-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 43, 78, 0.52);
+        backdrop-filter: blur(4px);
+        z-index: 70;
+        display: none;
+        justify-content: flex-end;
+    }
+
+    .bank-overlay.open {
+        display: flex;
+    }
+
+    .bank-drawer {
+        width: 100%;
+        max-width: 720px;
+        height: 100%;
+        background: var(--bb-surface);
+        border-left: 4px solid var(--bb-cyan);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .ai-stepper-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        border: 2px solid var(--bb-border);
+        background: #FFFFFF;
+        color: var(--bb-ink);
+        font-weight: 900;
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.12s ease;
+    }
+
+    .ai-stepper-btn:hover {
+        border-color: var(--bb-blue);
+        color: var(--bb-blue);
+        background: #EBF5FF;
     }
 </style>
 @endpush
 
 @section('content')
-<div class="topbar">
-    <div>
-        <div class="tgreet">Create Quiz ✨</div>
-        <div class="tsub">
-            {{ isset($generatedQuestions) ? 'Review, edit, and publish your AI-generated quiz.' : 'Choose between AI generation or build your quiz manually from scratch.' }}
+@php
+    $isEditing = isset($editingQuiz) && $editingQuiz;
+    $bankTotalQuestions = collect($questionBank ?? [])->sum(fn ($q) => count($q['questions'] ?? []));
+    $publishedModulesCount = collect($classModules ?? [])->count();
+
+    $defaultPublishedAt = old(
+        'published_at',
+        isset($published_at)
+            ? \Carbon\Carbon::parse($published_at)->format('Y-m-d\TH:i')
+            : ($isEditing && $editingQuiz->published_at
+                ? \Carbon\Carbon::parse($editingQuiz->published_at)->format('Y-m-d\TH:i')
+                : now()->format('Y-m-d\TH:i'))
+    );
+
+    $defaultDeadlineAt = old(
+        'deadline_at',
+        isset($deadline_at)
+            ? \Carbon\Carbon::parse($deadline_at)->format('Y-m-d\TH:i')
+            : ($isEditing && $editingQuiz->deadline_at
+                ? \Carbon\Carbon::parse($editingQuiz->deadline_at)->format('Y-m-d\TH:i')
+                : now()->addDays(7)->format('Y-m-d\TH:i'))
+    );
+@endphp
+
+<div class="bb-builder-page">
+
+    {{-- Top Hero Banner matching Landing Page & Teacher Dashboard --}}
+    <div class="bb-hero-banner">
+        <div class="bb-spectrum-strip"></div>
+        <div class="bb-hero-inner">
+            <div>
+                <div class="bb-hero-pill {{ $isEditing ? 'draft-pill' : '' }}">
+                    <span>
+                        {{ $isEditing ? '📝 Quiz Editor • Draft Mode' : '✨ Quiz Builder • 7 Question Types' }}
+                    </span>
+                </div>
+                <h1 class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">
+                    {{ $isEditing ? 'Edit Quiz: ' . ($editingQuiz->title ?? 'Untitled Draft') : 'Create New Quiz 📝' }}
+                </h1>
+                <p class="text-xs sm:text-sm font-extrabold text-[#4A688A] mt-1">
+                    Build from scratch with 7 interactive types, generate questions with Groq AI, reuse from your Question Bank, or save as a draft.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" onclick="openAiGenerator()" class="btn-ai-cyan">
+                    <span>🤖 AI Generate Questions</span>
+                </button>
+                <button type="button" onclick="openQuestionBank()" class="btn-bank-orange">
+                    <span>🏦 Question Bank</span>
+                    <span class="px-2.5 py-0.5 rounded-full bg-white text-[#D96B00] text-xs font-black">{{ $bankTotalQuestions }}</span>
+                </button>
+                <a href="{{ route('quiz.index') }}" class="btn-back-tactile">
+                    &larr; Back to Quizzes
+                </a>
+            </div>
         </div>
     </div>
-    <a href="{{ route('quiz.create') }}" class="btn-ghost">&larr; Change Selected Class</a>
+
+    @if (session('info'))
+        <div class="notice-banner">
+            ℹ️ {{ session('info') }}
+        </div>
+    @endif
+
+    @if ($errors->any())
+        <div class="error-banner mb-5">
+            ⚠️ Please fix the following before saving:
+            <ul class="list-disc pl-5 mt-1">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="create-quiz-wrapper">
+        <div class="card-box">
+            <div class="bb-spectrum-strip"></div>
+            <div class="card-box-body">
+                @if(isset($classes) && $classes->count() > 1)
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label">Select Target Class</label>
+                        <select id="classSelector" class="form-control" onchange="updateSelectedClass(this.value)">
+                            @foreach($classes as $c)
+                                <option value="{{ $c->id }}" {{ (isset($selectedClass) && $selectedClass->id == $c->id) ? 'selected' : '' }}>
+                                    {{ $c->class_name ?? $c->name }} (Code: {{ $c->class_code ?? $c->code ?? 'N/A' }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <div class="class-banner">
+                        <div>
+                            <div style="font-size: 10px; font-weight: 900; color: #4A688A; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Class</div>
+                            <div class="class-title">{{ $selectedClass->class_name ?? $selectedClass->name ?? 'Default Class' }}</div>
+                        </div>
+                        <div class="class-code-badge">
+                            Code: {{ $selectedClass->class_code ?? $selectedClass->code ?? 'N/A' }}
+                        </div>
+                    </div>
+                @endif
+
+                <!-- UNIFIED QUIZ BUILDER / EDITOR FORM -->
+                <form id="manualForm"
+                      action="{{ $isEditing ? route('quiz.update', $editingQuiz) : route('quiz.store') }}"
+                      method="POST">
+                    @csrf
+                    @if($isEditing)
+                        @method('PUT')
+                    @endif
+
+                    <input type="hidden" name="class_id" id="manualClassId" value="{{ $selectedClass->id ?? ($classes->first()->id ?? '') }}">
+                    <input type="hidden" name="save_action" id="saveActionInput" value="publish">
+
+                    <div class="form-group">
+                        <label class="form-label">Quiz Title</label>
+                        <input type="text"
+                               id="quizTitleInput"
+                               name="quiz_title"
+                               class="form-control"
+                               value="{{ old('quiz_title', $quiz_title ?? ($editingQuiz->title ?? ($preselectedModule->title ?? ''))) }}"
+                               placeholder="e.g. Grade 3 Science & Math Quest"
+                               required>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Subject</label>
+                            <input type="text"
+                                   id="quizSubjectInput"
+                                   name="subject"
+                                   class="form-control"
+                                   value="{{ old('subject', $subject ?? ($editingQuiz->subject ?? 'General')) }}"
+                                   required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Max Attempts</label>
+                            <input type="number"
+                                   name="max_attempts"
+                                   class="form-control"
+                                   value="{{ old('max_attempts', $max_attempts ?? ($editingQuiz->max_attempts ?? 1)) }}"
+                                   min="1">
+                        </div>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Publish Date</label>
+                            <input type="datetime-local" name="published_at" class="form-control" value="{{ $defaultPublishedAt }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Deadline Date</label>
+                            <input type="datetime-local" name="deadline_at" class="form-control" value="{{ $defaultDeadlineAt }}" required>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 my-5 pt-4 border-t-2 border-dashed border-[#C7E0FF]">
+                        <h3 class="font-display text-lg font-bold text-[#0D2B4E]">
+                            Quiz Questions (<span id="totalQuestionsBadge" class="text-[#0066D6]">0</span>)
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" onclick="openAiGenerator()" class="btn-ai-cyan text-xs py-2 px-3.5">
+                                🤖 Generate with AI
+                            </button>
+                            <button type="button" onclick="openQuestionBank()" class="btn-bank-orange text-xs py-2 px-3.5">
+                                🏦 Import from Published Quizzes
+                            </button>
+                        </div>
+                    </div>
+                    <br>
+
+                    <div id="questionsContainer"></div>
+
+                    <!-- Add Question Type Selector Bar -->
+                    <div class="p-5 rounded-3xl border-3 border-dashed border-[#38BDF8] bg-[#F5FAFF] text-center mb-5">
+                        <div class="text-[11px] font-black uppercase tracking-wider text-[#0066D6] mb-3">
+                            ➕ Add a New Question by Type
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-2">
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'multiple_choice' })">🔘 Multiple Choice</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'multiple_select' })">☑️ Multiple Select</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'true_false' })">⚖️ True / False</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'matching' })">🔗 Matching</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'fill_blank' })">✏️ Fill-in-the-Blank</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'short_answer' })">💬 Short Answer</button>
+                            <button type="button" class="type-pill-btn" onclick="addQuestionCard({ type: 'essay' })">📝 Essay</button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-end gap-3 mt-6 pt-4 border-t-2 border-[#E0EEFF]">
+                        <button type="button" onclick="submitQuizForm('draft')" class="btn-draft-tactile">
+                            💾 Save as Draft
+                        </button>
+                        <button type="button" onclick="submitQuizForm('publish')" class="btn-submit btn-publish-green">
+                            🚀 Publish Quiz Now
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Right Guide Sidebar matching Dashboard Cards --}}
+        <div class="sidebar-card">
+            <div class="bb-spectrum-strip"></div>
+            <div class="sidebar-header">
+                <div class="sidebar-title">💡 7-Type Quiz Guide</div>
+            </div>
+            <div class="sidebar-body">
+                <div class="sidebar-item accent-blue">
+                    🤖 <strong>AI Question Generator:</strong> Upload a lesson file from your computer or pick a published class file, set exact counts per question type, and paste the results straight into your quiz!
+                </div>
+                <div class="sidebar-item accent-orange">
+                    🏦 <strong>Question Bank:</strong> Click <strong>Question Bank</strong> to search and pull questions from any quiz you already published, separated per quiz.
+                </div>
+                <div class="sidebar-item accent-green">
+                    💾 <strong>Drafts &amp; Publishing:</strong> Save unfinished quizzes as a <strong>Draft</strong> anytime, then edit or publish them from your Quizzes dashboard.
+                </div>
+                <div class="sidebar-item accent-amber">
+                    ⏱️ <strong>Flexible Timers:</strong> Set each question's timer in <strong>Seconds</strong>, <strong>Minutes</strong>, or <strong>Hours</strong> using the unit dropdown.
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="dashboard-grid">
-    <div class="col-8">
-        <div class="card">
-            {{-- Target Class Badge --}}
-            <div style="margin-bottom: 20px; padding: 12px 16px; background: #FFF8F0; border: 2px solid #FFE4C4; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+{{-- =========================================================================
+     AI QUESTION GENERATOR DRAWER (MATCHES QUESTION BANK FORMATTING)
+     ========================================================================= --}}
+<div id="aiGeneratorOverlay" class="bank-overlay" onclick="if(event.target===this) closeAiGenerator()">
+    <div class="bank-drawer">
+        <div class="bb-spectrum-strip"></div>
+
+        <div class="p-5 bg-white border-b-2 border-[#C7E0FF]">
+            <div class="flex items-center justify-between gap-3">
                 <div>
-                    <span style="font-size: 11px; font-weight: 800; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Class</span>
-                    <div style="font-size: 16px; font-weight: 900; color: #FF6B6B;">{{ $selectedClass->name }}</div>
+                    <div class="text-[11px] font-black uppercase tracking-wider text-[#0066D6]">🤖 Groq AI Lesson Analyzer</div>
+                    <h2 class="font-display text-2xl font-bold text-[#0D2B4E]">AI Question Generator</h2>
                 </div>
-                <span class="role-badge" style="background: #FFE4C4; color: #2D2D2D; font-weight: 800; padding: 4px 10px; border-radius: 8px;">
-                    Code: {{ $selectedClass->code }}
-                </span>
+                <button type="button" onclick="closeAiGenerator()" class="w-10 h-10 rounded-2xl bg-[#F5FAFF] border-2 border-[#C7E0FF] font-black text-lg text-[#0D2B4E] hover:bg-[#EBF5FF] hover:border-[#0066D6] cursor-pointer">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-5">
+            {{-- 1. Source File Selection (Computer Upload OR Published Class Files) --}}
+            <div class="bg-white rounded-3xl border-2.5 border-[#C7E0FF] p-4 shadow-xs">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <span class="form-label text-[#0D2B4E]">1. Choose Lesson Source File</span>
+                    <div class="flex gap-1.5">
+                        <button type="button" id="aiSrcComputerBtn" class="type-pill-btn active" onclick="switchAiSourceTab('computer')">
+                            💻 From Computer
+                        </button>
+                        <button type="button" id="aiSrcClassBtn" class="type-pill-btn" onclick="switchAiSourceTab('class')">
+                            📚 Published Class Files ({{ $publishedModulesCount }})
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Source Tab A: Computer Upload --}}
+                <div id="aiSourceComputerPane">
+                    <label class="file-dropzone block">
+                        <div class="w-11 h-11 mx-auto mb-2 rounded-2xl bg-white border-2 border-[#C7E0FF] shadow-xs flex items-center justify-center text-xl">
+                            📄
+                        </div>
+                        <div class="text-xs font-black text-[#0066D6] mb-1" id="aiComputerFileLabel">
+                            Click to choose a lesson file from your computer
+                        </div>
+                        <input type="file"
+                               id="aiModuleFileInput"
+                               onchange="onAiComputerFileSelected(this)"
+                               accept=".pdf,.txt,.md,.docx,.pptx,.jpg,.jpeg,.png,.webp,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.webm"
+                               class="hidden">
+                        <div class="text-[11px] font-bold text-[#4A688A]">
+                            Supports PDF, Word (.docx), PowerPoint (.pptx), Images, Audio, and Video (up to 25MB)
+                        </div>
+                    </label>
+                </div>
+
+                {{-- Source Tab B: Published Class Files --}}
+                <div id="aiSourceClassPane" style="display: none;">
+                    <input type="text"
+                           id="aiModuleSearchInput"
+                           oninput="renderAiClassModules()"
+                           placeholder="🔍 Search published class files by title, filename, or class..."
+                           class="form-control mb-2.5">
+                    <div id="aiClassModulesList" class="max-h-48 overflow-y-auto space-y-2 pr-1"></div>
+                </div>
             </div>
 
-            @if(isset($generatedQuestions))
-                {{-- ============================================================== --}}
-                {{-- PHASE 2: EDIT & PUBLISH AI GENERATED QUESTIONS                 --}}
-                {{-- ============================================================== --}}
-                <form action="{{ route('quiz.store') }}" method="POST">
-                    @csrf
-                    <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
-                    <input type="hidden" name="quiz_mode" value="ai">
-                    <input type="hidden" name="quiz_title" value="{{ $quiz_title }}">
-                    <input type="hidden" name="subject" value="{{ $subject }}">
-                    <input type="hidden" name="published_at" value="{{ $published_at }}">
-                    <input type="hidden" name="deadline_at" value="{{ $deadline_at }}">
-                    <input type="hidden" name="max_attempts" value="{{ $max_attempts ?? 1 }}">
-                    
-                    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 16px;">
-                        <h3 style="font-size: 16px; font-weight: 900; color: #2D2D2D;">
-                            Edit Generated Questions for "{{ $quiz_title }}"
-                        </h3>
+            {{-- 2. Question Type Counts Selector --}}
+            <div class="bg-white rounded-3xl border-2.5 border-[#C7E0FF] p-4 shadow-xs">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <span class="form-label text-[#0D2B4E] block">2. Choose Question Types &amp; Counts</span>
+                        <span class="text-[11px] font-bold text-[#4A688A]">Set how many questions AI should generate for each type</span>
                     </div>
-
-                    @foreach($generatedQuestions as $index => $q)
-                        <div class="q-block">
-                            <div class="q-block-title">Question {{ $index + 1 }}</div>
-                            
-                            <div class="form-field">
-                                <label class="form-label">Question Text</label>
-                                <textarea name="questions[{{ $index }}][text]" class="form-textarea" rows="2" required>{{ $q['question'] }}</textarea>
-                            </div>
-
-                            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-                                @for($i = 0; $i < 4; $i++)
-                                    <div class="form-field" style="margin:0;">
-                                        <label class="form-label">Option {{ $i + 1 }}</label>
-                                        <input type="text" name="questions[{{ $index }}][options][]" class="form-input" value="{{ $q['options'][$i] ?? '' }}" required>
-                                    </div>
-                                @endfor
-                            </div>
-
-                            <div class="form-field">
-                                <label class="form-label" style="color: #10B981;">Correct Answer (Must exactly match one of the options above)</label>
-                                <input type="text" name="questions[{{ $index }}][answer]" class="form-input" style="border-color: #10B981;" value="{{ $q['answer'] }}" required>
-                            </div>
-
-                            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                                <div class="form-field">
-                                    <label class="form-label">Time Limit (Seconds)</label>
-                                    <input type="number" name="questions[{{ $index }}][time_limit]" class="form-input" value="30" min="5" required>
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Points (XP)</label>
-                                    <input type="number" name="questions[{{ $index }}][points]" class="form-input" value="100" min="1" required>
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Difficulty</label>
-                                    <select name="questions[{{ $index }}][difficulty]" class="form-input" required>
-                                        <option value="easy" {{ ($q['difficulty'] ?? '') == 'easy' ? 'selected' : '' }}>Easy</option>
-                                        <option value="medium" {{ ($q['difficulty'] ?? 'medium') == 'medium' ? 'selected' : '' }}>Medium</option>
-                                        <option value="hard" {{ ($q['difficulty'] ?? '') == 'hard' ? 'selected' : '' }}>Hard</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-
-                    <div style="text-align: right; border-top: 2px solid #FFE4C4; padding-top: 16px; margin-top: 8px;">
-                        <button type="submit" class="btn-primary">
-                            🚀 Publish AI Quiz to Class
-                        </button>
-                    </div>
-                </form>
-
-            @else
-                {{-- ============================================================== --}}
-                {{-- PHASE 1: MODE SELECTION (AI GENERATION VS MANUAL BUILD)        --}}
-                {{-- ============================================================== --}}
-                
-                <div class="mode-tabs">
-                    <div id="ai-mode-btn" class="mode-btn active" onclick="switchMode('ai')">🤖 AI Generated</div>
-                    <div id="manual-mode-btn" class="mode-btn" onclick="switchMode('manual')">✍️ Manual Creation</div>
+                    <span class="px-3 py-1 rounded-full bg-[#EBF5FF] border-2 border-[#93C5FD] text-xs font-black text-[#0066D6]">
+                        Total: <span id="aiRequestedTotalCount">5</span> question(s)
+                    </span>
                 </div>
 
-                {{-- AI FORM --}}
-                <form id="ai-form" action="{{ route('quiz.generate') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3" id="aiTypeCountersGrid"></div>
 
-                    <div class="form-field">
-                        <label class="form-label">Quiz Title</label>
-                        <input type="text" name="quiz_title" class="form-input" value="{{ old('quiz_title') }}" placeholder="e.g. Chapter 1: Networking Basics" required>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-dashed border-[#C7E0FF]">
+                    <div class="flex items-center gap-2">
+                        <span class="form-label">Difficulty:</span>
+                        <select id="aiDifficultySelect" class="form-control py-1.5 px-3 text-xs" style="width: auto;">
+                            <option value="mixed">🎯 Mixed</option>
+                            <option value="easy">🌱 Easy</option>
+                            <option value="medium">⚡ Medium</option>
+                            <option value="hard">🚀 Hard</option>
+                        </select>
                     </div>
-
-                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 12px;">
-                        <div class="form-field">
-                            <label class="form-label">Subject Context</label>
-                            <input type="text" name="subject" class="form-input" value="{{ old('subject', 'General') }}" placeholder="e.g. Information Technology" required>
-                        </div>
-                        <div class="form-field">
-                            <label class="form-label">Number of Questions</label>
-                            <input type="number" name="question_count" class="form-input" value="{{ old('question_count', 5) }}" min="1" max="50" required>
-                        </div>
-                        <div class="form-field">
-                            <label class="form-label">Max Attempts per Student</label>
-                            <input type="number" name="max_attempts" class="form-input" value="{{ old('max_attempts', 1) }}" min="1" placeholder="e.g. 1" required>
-                        </div>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Upload Module (PDF only)</label>
-                        <div style="border: 2px dashed #FFB347; padding: 2rem; border-radius: 12px; text-align: center; background: #FFF8F0;">
-                            <input type="file" name="module_pdf" accept="application/pdf" required style="width: 100%; cursor: pointer;">
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 15px; margin-bottom: 12px;">
-                        <div class="form-field" style="flex: 1;">
-                            <label class="form-label">Publish Date</label>
-                            <input type="datetime-local" name="published_at" class="form-input" value="{{ old('published_at', now()->format('Y-m-d\TH:i')) }}" required>
-                        </div>
-                        <div class="form-field" style="flex: 1;">
-                            <label class="form-label">Deadline</label>
-                            <input type="datetime-local" name="deadline_at" class="form-input" value="{{ old('deadline_at', now()->addDays(7)->format('Y-m-d\TH:i')) }}" required>
-                        </div>
-                    </div>
-
-                    <div style="text-align: right; border-top: 2px solid #FFE4C4; padding-top: 16px;">
-                        <button type="submit" class="btn-primary" onclick="this.innerHTML='Generating... ⏳'; this.style.opacity='0.7';">
-                            ✨ Generate Questions
-                        </button>
-                    </div>
-                </form>
-
-                {{-- MANUAL FORM --}}
-                <form id="manual-form" action="{{ route('quiz.store') }}" method="POST" style="display: none;">
-                    @csrf
-                    <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
-                    <input type="hidden" name="quiz_mode" value="manual">
-
-                    <div class="form-field">
-                        <label class="form-label">Quiz Title</label>
-                        <input type="text" name="quiz_title" class="form-input" placeholder="e.g. Midterm Examination" required>
-                    </div>
-
-                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 12px;">
-                        <div class="form-field">
-                            <label class="form-label">Subject Context</label>
-                            <input type="text" name="subject" class="form-input" value="General" placeholder="e.g. Science" required>
-                        </div>
-                        <div class="form-field">
-                            <label class="form-label">Max Attempts per Student</label>
-                            <input type="number" name="max_attempts" class="form-input" value="1" min="1" placeholder="e.g. 1" required>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                        <div class="form-field" style="flex: 1;">
-                            <label class="form-label">Publish Date</label>
-                            <input type="datetime-local" name="published_at" class="form-input" value="{{ now()->format('Y-m-d\TH:i') }}" required>
-                        </div>
-                        <div class="form-field" style="flex: 1;">
-                            <label class="form-label">Deadline</label>
-                            <input type="datetime-local" name="deadline_at" class="form-input" value="{{ now()->addDays(7)->format('Y-m-d\TH:i') }}" required>
-                        </div>
-                    </div>
-
-                    <div id="manual-questions-container">
-                        <!-- Dynamic Manual Question Blocks will render here -->
-                    </div>
-
-                    <button type="button" class="btn-ghost" onclick="addManualQuestion()" style="width: 100%; justify-content: center; margin-bottom: 20px; border-style: dashed;">
-                        + Add Question Item
+                    <button type="button" id="btnRunAiGenerate" onclick="runAiGeneration()" class="btn-submit py-2.5 px-5 text-xs">
+                        ⚡ Generate Questions
                     </button>
+                </div>
 
-                    <div style="text-align: right; border-top: 2px solid #FFE4C4; padding-top: 16px;">
-                        <button type="submit" class="btn-primary">
-                            🚀 Publish Manual Quiz
-                        </button>
-                    </div>
-                </form>
-            @endif
+                <div id="aiErrorBox" class="error-banner mt-3" style="display: none;"></div>
+            </div>
+
+            {{-- 3. Generated Questions Preview (Identical card formatting to Question Bank) --}}
+            <div id="aiResultsSection" style="display: none;">
+                <div class="flex items-center justify-between gap-2 mb-2.5">
+                    <span class="font-display text-base font-bold text-[#0D2B4E]">
+                        ✨ Generated Questions Preview (<span id="aiGeneratedResultCount">0</span>)
+                    </span>
+                    <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border-2 border-[#93C5FD] text-xs font-black text-[#0066D6] cursor-pointer">
+                        <input type="checkbox" id="aiSelectAllCheckbox" checked onchange="toggleAllAiGenerated(this.checked)" class="w-4 h-4 accent-[#0066D6]">
+                        <span>Select All</span>
+                    </label>
+                </div>
+
+                <div id="aiGeneratedList" class="space-y-2.5"></div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-white border-t-2 border-[#C7E0FF] flex items-center justify-between gap-3">
+            <div class="text-sm font-black text-[#0D2B4E]">
+                <span id="aiSelectedCount" class="text-[#0066D6]">0</span> question(s) ready to paste
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="closeAiGenerator()" class="px-3.5 py-2.5 rounded-xl font-black text-xs text-[#4A688A] bg-[#F5FAFF] border-2 border-[#C7E0FF] cursor-pointer">
+                    Close
+                </button>
+                <button type="button" id="btnPasteAiQuestions" onclick="pasteSelectedAiQuestions()" class="btn-submit btn-publish-green py-2.5 px-5 text-xs" disabled>
+                    📋 Paste Selected to Questionnaire
+                </button>
+            </div>
         </div>
     </div>
-    
-    <!-- Info Panel -->
-    <div class="col-4">
-        <div class="card" style="background: linear-gradient(135deg, #FF6B6B, #FFB347); color: #fff; border: none;">
-            <div style="font-size: 18px; font-weight: 900; margin-bottom: 12px;">Quiz Creation Modes 🤖</div>
-            <div style="font-size: 13px; font-weight: 700; line-height: 1.6; opacity: 0.95;">
-                <p style="margin-bottom: 12px;"><strong>🤖 AI Generated:</strong> Upload a PDF module, let Gemini craft multiple-choice questions, and fine-tune questions, time limits, XP, difficulty levels, and attempt limits before publishing.</p>
-                <p><strong>✍️ Manual Creation:</strong> Directly construct custom questions, answer options, time limits, reward XP points, difficulty tiers, and attempt limits item by item.</p>
+</div>
+
+{{-- =========================================================================
+     PER-QUIZ SEARCHABLE QUESTION BANK DRAWER
+     ========================================================================= --}}
+<div id="questionBankOverlay" class="bank-overlay" onclick="if(event.target===this) closeQuestionBank()">
+    <div class="bank-drawer">
+        <div class="bb-spectrum-strip"></div>
+
+        <div class="p-5 bg-white border-b-2 border-[#C7E0FF]">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <div>
+                    <div class="text-[11px] font-black uppercase tracking-wider text-[#FF8400]">🏦 Published Quizzes Library</div>
+                    <h2 class="font-display text-2xl font-bold text-[#0D2B4E]">Teacher Question Bank</h2>
+                </div>
+                <button type="button" onclick="closeQuestionBank()" class="w-10 h-10 rounded-2xl bg-[#F5FAFF] border-2 border-[#C7E0FF] font-black text-lg text-[#0D2B4E] hover:bg-[#FFF7ED] hover:border-[#FF8400] cursor-pointer">
+                    ✕
+                </button>
+            </div>
+
+            <input type="text" id="bankSearchInput" oninput="renderQuestionBank()"
+                   placeholder="🔍 Search by question text, keyword, or published quiz title..."
+                   class="form-control mb-3">
+
+            <div id="bankTypeFilters" class="flex flex-wrap gap-1.5">
+                <button type="button" class="type-pill-btn active" onclick="setBankFilter('all', this)">All Types</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('multiple_choice', this)">🔘 Multiple Choice</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('multiple_select', this)">☑️ Multi-Select</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('true_false', this)">⚖️ True/False</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('matching', this)">🔗 Matching</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('fill_blank', this)">✏️ Fill-Blank</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('short_answer', this)">💬 Short Answer</button>
+                <button type="button" class="type-pill-btn" onclick="setBankFilter('essay', this)">📝 Essay</button>
+            </div>
+        </div>
+
+        <div id="bankQuizzesList" class="flex-1 overflow-y-auto p-5 space-y-4"></div>
+
+        <div class="p-4 bg-white border-t-2 border-[#C7E0FF] flex items-center justify-between gap-3">
+            <div class="text-sm font-black text-[#0D2B4E]">
+                <span id="bankSelectedCount" class="text-[#0066D6]">0</span> question(s) selected
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="clearBankSelection()" class="px-3.5 py-2.5 rounded-xl font-black text-xs text-[#4A688A] bg-[#F5FAFF] border-2 border-[#C7E0FF] cursor-pointer">
+                    Clear
+                </button>
+                <button type="button" onclick="importSelectedFromBank()" class="btn-submit py-2.5 px-5 text-xs">
+                    ➕ Extract &amp; Add Selected
+                </button>
             </div>
         </div>
     </div>
@@ -283,80 +949,930 @@
 
 @push('scripts')
 <script>
-    let qIndex = 0;
+    const QUESTION_BANK = @json($questionBank ?? []);
+    const CLASS_MODULES = @json($classModules ?? []);
+    const PRESELECTED_MODULE_ID = @json(isset($preselectedModule) && $preselectedModule ? $preselectedModule->id : null);
+    const INITIAL_QUESTIONS = @json($generatedQuestions ?? []);
+    const GENERATE_URL = @json(route('quiz.generate'));
+    const CSRF_TOKEN = @json(csrf_token());
 
-    // Switch between AI and Manual creation mode tabs
-    function switchMode(mode) {
-        document.getElementById('ai-mode-btn').classList.toggle('active', mode === 'ai');
-        document.getElementById('manual-mode-btn').classList.toggle('active', mode === 'manual');
-        document.getElementById('ai-form').style.display = mode === 'ai' ? 'block' : 'none';
-        document.getElementById('manual-form').style.display = mode === 'manual' ? 'block' : 'none';
-        
-        // Add default initial question if switching to manual for the first time
-        if (mode === 'manual' && qIndex === 0) {
-            addManualQuestion();
+    const selectedBankIds = new Set();
+    let activeBankFilter = 'all';
+
+    // AI Generator Drawer State
+    let aiSourceMode = PRESELECTED_MODULE_ID ? 'class' : 'computer';
+    let selectedClassModuleId = PRESELECTED_MODULE_ID;
+    let aiGeneratedPool = [];
+    const selectedAiIndices = new Set();
+    const aiTypeCounts = {
+        multiple_choice: 5,
+        multiple_select: 0,
+        true_false: 0,
+        matching: 0,
+        fill_blank: 0,
+        short_answer: 0,
+        essay: 0,
+    };
+
+    const TYPE_CONFIG = {
+        multiple_choice: { label: 'Multiple Choice', icon: '🔘', bg: '#EBF5FF', color: '#0066D6' },
+        multiple_select: { label: 'Multiple Select', icon: '☑️', bg: '#ECFEFF', color: '#0E7490' },
+        true_false:      { label: 'True / False',    icon: '⚖️', bg: '#ECFCCB', color: '#3E8708' },
+        matching:        { label: 'Matching',        icon: '🔗', bg: '#FFF7ED', color: '#C2410C' },
+        fill_blank:      { label: 'Fill-in-the-Blank', icon: '✏️', bg: '#FEF9C3', color: '#854D0E' },
+        short_answer:    { label: 'Short Answer',    icon: '💬', bg: '#F3E8FF', color: '#6B21A8' },
+        essay:           { label: 'Essay',           icon: '📝', bg: '#FCE7F3', color: '#9D174D' },
+    };
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function updateSelectedClass(classId) {
+        const manualClassInput = document.getElementById('manualClassId');
+        if (manualClassInput) manualClassInput.value = classId;
+        renderAiClassModules();
+    }
+
+    function submitQuizForm(actionType) {
+        const form = document.getElementById('manualForm');
+        document.getElementById('saveActionInput').value = actionType;
+        if (form.reportValidity()) {
+            form.submit();
         }
     }
 
-    // Dynamic Manual Question Builder
-    function addManualQuestion() {
-        const container = document.getElementById('manual-questions-container');
-        const html = `
-            <div class="q-block" id="mq-${qIndex}">
-                ${qIndex > 0 ? `<button type="button" class="remove-q-btn" onclick="document.getElementById('mq-${qIndex}').remove()">Remove Item</button>` : ''}
-                <div class="q-block-title">Question Item #${qIndex + 1}</div>
-                
-                <div class="form-field">
-                    <label class="form-label">Question Text</label>
-                    <textarea name="questions[${qIndex}][text]" class="form-textarea" rows="2" placeholder="e.g. What is the powerhouse of the cell?" required></textarea>
-                </div>
+    /* =========================================================================
+       TIME UNIT CONVERSION HELPER (SECONDS / MINUTES / HOURS)
+       ========================================================================= */
+    function resolveInitialTimeParts(rawSeconds) {
+        const sec = Math.max(5, parseInt(rawSeconds, 10) || 30);
+        if (sec % 3600 === 0) {
+            return { value: sec / 3600, unit: 'hours', totalSeconds: sec };
+        }
+        if (sec % 60 === 0 && sec >= 60) {
+            return { value: sec / 60, unit: 'minutes', totalSeconds: sec };
+        }
+        return { value: sec, unit: 'seconds', totalSeconds: sec };
+    }
 
-                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-                    <div class="form-field" style="margin:0;">
-                        <label class="form-label">Option 1</label>
-                        <input type="text" name="questions[${qIndex}][options][]" class="form-input" required>
-                    </div>
-                    <div class="form-field" style="margin:0;">
-                        <label class="form-label">Option 2</label>
-                        <input type="text" name="questions[${qIndex}][options][]" class="form-input" required>
-                    </div>
-                    <div class="form-field" style="margin:0;">
-                        <label class="form-label">Option 3</label>
-                        <input type="text" name="questions[${qIndex}][options][]" class="form-input" required>
-                    </div>
-                    <div class="form-field" style="margin:0;">
-                        <label class="form-label">Option 4</label>
-                        <input type="text" name="questions[${qIndex}][options][]" class="form-input" required>
-                    </div>
-                </div>
+    function syncQuestionTimeSeconds(el) {
+        const card = el.closest('.question-card');
+        if (!card) return;
+        const valInput = card.querySelector('.q-time-val-field');
+        const unitSelect = card.querySelector('.q-time-unit-field');
+        const hiddenSec = card.querySelector('.q-time-field');
 
-                <div class="form-field">
-                    <label class="form-label" style="color: #10B981;">Correct Answer (Must exactly match one of the options above)</label>
-                    <input type="text" name="questions[${qIndex}][answer]" class="form-input" style="border-color: #10B981;" required>
-                </div>
+        const rawVal = Math.max(1, parseInt(valInput.value, 10) || 1);
+        const unit = unitSelect.value;
+        const multiplier = unit === 'hours' ? 3600 : (unit === 'minutes' ? 60 : 1);
+        hiddenSec.value = Math.max(5, rawVal * multiplier);
+    }
 
-                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <div class="form-field">
-                        <label class="form-label">Time Limit (Seconds)</label>
-                        <input type="number" name="questions[${qIndex}][time_limit]" class="form-input" value="30" min="5" required>
-                    </div>
-                    <div class="form-field">
-                        <label class="form-label">Points (XP)</label>
-                        <input type="number" name="questions[${qIndex}][points]" class="form-input" value="100" min="1" required>
-                    </div>
-                    <div class="form-field">
-                        <label class="form-label">Difficulty</label>
-                        <select name="questions[${qIndex}][difficulty]" class="form-input" required>
-                            <option value="easy">Easy</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="hard">Hard</option>
+    /* =========================================================================
+       QUESTIONNAIRE BUILDER CARDS
+       ========================================================================= */
+    function addQuestionCard(preset = {}) {
+        const container = document.getElementById('questionsContainer');
+        const type = TYPE_CONFIG[preset.type] ? preset.type : 'multiple_choice';
+        const prompt = preset.prompt || preset.question || '';
+        const difficulty = preset.difficulty || 'easy';
+        const points = preset.points || 100;
+        const timeParts = resolveInitialTimeParts(preset.time_limit || preset.time_limit_seconds || 30);
+
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.dataset.type = type;
+
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom: 14px;">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="qcard-number px-3 py-1 rounded-full bg-[#EBF5FF] border-2 border-[#93C5FD] font-display font-bold text-xs text-[#0066D6]">Question 1</span>
+                    ${preset.fromQuiz ? `<span class="px-2.5 py-0.5 rounded-full bg-[#FFF7ED] border border-[#FF8400] text-[#C2410C] text-[11px] font-black">🏦 From: ${escapeHtml(preset.fromQuiz)}</span>` : ''}
+                    ${preset.fromAi ? `<span class="px-2.5 py-0.5 rounded-full bg-[#EBF5FF] border border-[#1DC4DF] text-[#0066D6] text-[11px] font-black">🤖 AI Generated</span>` : ''}
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="moveQuestionCard(this, -1)" class="px-2.5 py-1 rounded-xl bg-[#F5FAFF] border-2 border-[#C7E0FF] font-black text-xs text-[#0D2B4E] hover:border-[#0066D6] cursor-pointer" title="Move Up">↑</button>
+                    <button type="button" onclick="moveQuestionCard(this, 1)" class="px-2.5 py-1 rounded-xl bg-[#F5FAFF] border-2 border-[#C7E0FF] font-black text-xs text-[#0D2B4E] hover:border-[#0066D6] cursor-pointer" title="Move Down">↓</button>
+                    <button type="button" class="btn-remove-question" onclick="removeQuestionCard(this)">🗑️ Remove</button>
+                </div>
+            </div>
+
+            <div class="mb-3.5">
+                <label class="form-label mb-1.5 block">Question Type</label>
+                <div class="flex flex-wrap gap-1.5 qcard-type-bar">
+                    ${Object.entries(TYPE_CONFIG).map(([key, meta]) => `
+                        <button type="button" class="type-pill-btn ${key === type ? 'active' : ''}" onclick="switchCardType(this, '${key}')">
+                            ${meta.icon} ${meta.label}
+                        </button>
+                    `).join('')}
+                </div>
+                <input type="hidden" class="q-type-field" value="${type}">
+            </div>
+            <br>
+            <div class="form-group">
+                <div class="flex items-center justify-between">
+                    <label class="form-label">Question Text *</label>
+                    <button type="button" onclick="insertBlankIntoPrompt(this)"
+                            class="btn-insert-blank ${type === 'fill_blank' ? '' : 'hidden'} px-2.5 py-1 rounded-xl bg-[#FEF9C3] border-2 border-[#FACC15] text-[#854D0E] text-[11px] font-black cursor-pointer">
+                        + Insert [blank] (___)
+                    </button>
+                </div>
+                <textarea rows="2" class="form-control q-text-field" oninput="syncFillBlankSlots(this)" placeholder="Type your question prompt..." required>${escapeHtml(prompt)}</textarea>
+            </div>
+
+            <div class="qcard-dynamic-body mb-4"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t-2 border-dashed border-[#C7E0FF]">
+                <div>
+                    <label class="form-label">Difficulty</label>
+                    <select class="form-control q-diff-field">
+                        <option value="easy" ${difficulty === 'easy' ? 'selected' : ''}>🌱 Easy</option>
+                        <option value="medium" ${difficulty === 'medium' ? 'selected' : ''}>⚡ Medium</option>
+                        <option value="hard" ${difficulty === 'hard' ? 'selected' : ''}>🚀 Hard</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">XP Stars ⭐</label>
+                    <input type="number" class="form-control q-points-field" value="${points}" min="10" max="1000" step="10" required>
+                </div>
+                <div>
+                    <label class="form-label">Time Limit ⏱️</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="number"
+                               class="form-control q-time-val-field"
+                               value="${timeParts.value}"
+                               min="1"
+                               max="999"
+                               oninput="syncQuestionTimeSeconds(this)"
+                               style="flex:1; min-width:64px;"
+                               required>
+                        <select class="form-control q-time-unit-field"
+                                onchange="syncQuestionTimeSeconds(this)"
+                                style="width:auto; min-width:105px; padding-left:10px; padding-right:10px;">
+                            <option value="seconds" ${timeParts.unit === 'seconds' ? 'selected' : ''}>Seconds</option>
+                            <option value="minutes" ${timeParts.unit === 'minutes' ? 'selected' : ''}>Minutes</option>
+                            <option value="hours" ${timeParts.unit === 'hours' ? 'selected' : ''}>Hours</option>
                         </select>
+                        <input type="hidden" class="q-time-field" value="${timeParts.totalSeconds}">
                     </div>
                 </div>
             </div>
         `;
-        container.insertAdjacentHTML('beforeend', html);
-        qIndex++;
+
+        container.appendChild(card);
+        renderCardDynamicBody(card, type, preset);
+        reindexAllCards();
     }
+
+    function switchCardType(btn, newType) {
+        const card = btn.closest('.question-card');
+        card.dataset.type = newType;
+        card.querySelector('.q-type-field').value = newType;
+        card.querySelectorAll('.qcard-type-bar .type-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const blankBtn = card.querySelector('.btn-insert-blank');
+        if (blankBtn) blankBtn.classList.toggle('hidden', newType !== 'fill_blank');
+
+        renderCardDynamicBody(card, newType, {});
+        reindexAllCards();
+    }
+
+    function renderCardDynamicBody(card, type, preset = {}) {
+        const body = card.querySelector('.qcard-dynamic-body');
+
+        if (type === 'multiple_choice' || type === 'multiple_select') {
+            const isMulti = type === 'multiple_select';
+            const opts = (preset.options && preset.options.length) ? preset.options : ['', '', '', ''];
+            const correctList = Array.isArray(preset.correct_answers) && preset.correct_answers.length
+                ? preset.correct_answers.map(v => String(v).trim())
+                : (preset.correct_answer ? [String(preset.correct_answer).trim()] : []);
+
+            body.innerHTML = `
+                <label class="form-label mb-1.5 block">
+                    ${isMulti ? '☑️ Check ALL Correct Options:' : '🔘 Select the ONE Correct Option:'}
+                </label>
+                <div class="space-y-2 q-opts-list">
+                    ${opts.map((optVal, i) => {
+                        const isChecked = correctList.includes(String(optVal).trim()) && String(optVal).trim() !== ''
+                            || (correctList.length === 0 && !isMulti && i === 0);
+                        return `
+                            <div class="flex items-center gap-2 q-opt-row">
+                                <input type="${isMulti ? 'checkbox' : 'radio'}" class="q-opt-correct w-5 h-5 accent-[#68CC18] cursor-pointer shrink-0" value="${i}" ${isChecked ? 'checked' : ''}>
+                                <input type="text" class="form-control q-opt-input bg-[#F5FAFF]" value="${escapeHtml(optVal)}" placeholder="Option ${i + 1}" required>
+                                <button type="button" onclick="removeOptRow(this)" class="px-2.5 py-2 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] font-black text-xs cursor-pointer">✕</button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <br>
+                <button type="button" onclick="addOptRow(this, ${isMulti})" class="mt-2.5 px-3.5 py-1.5 rounded-xl bg-[#EBF5FF] border-2 border-[#93C5FD] text-[#0066D6] font-black text-xs cursor-pointer">
+                    + Add Choice
+                </button>
+            `;
+        } else if (type === 'true_false') {
+            const rawTf = String(preset.correct_answer || (preset.correct_answers && preset.correct_answers[0]) || 'True');
+            const isFalse = rawTf.toLowerCase() === 'false';
+            body.innerHTML = `
+                <label class="form-label mb-1.5 block">⚖️ Select Correct Answer:</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2.5 border-[#84CC16] bg-[#F4FCEB] text-[#365314] font-black text-sm cursor-pointer shadow-xs">
+                        <input type="radio" class="q-tf-radio w-5 h-5 accent-[#68CC18]" value="True" ${!isFalse ? 'checked' : ''}>
+                        <span>✅ TRUE</span>
+                    </label>
+                    <label class="flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2.5 border-[#FB923C] bg-[#FFF7ED] text-[#9A3412] font-black text-sm cursor-pointer shadow-xs">
+                        <input type="radio" class="q-tf-radio w-5 h-5 accent-[#FF8400]" value="False" ${isFalse ? 'checked' : ''}>
+                        <span>❌ FALSE</span>
+                    </label>
+                </div>
+            `;
+        } else if (type === 'matching') {
+            const pairs = (preset.matching_pairs && preset.matching_pairs.length)
+                ? preset.matching_pairs
+                : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }];
+            body.innerHTML = `
+                <label class="form-label mb-1.5 block">🔗 Matching Pairs (Left Item ↔ Right Match):</label>
+                <div class="space-y-2 q-pairs-list">
+                    ${pairs.map((p, i) => `
+                        <div class="grid grid-cols-12 gap-2 items-center q-pair-row">
+                            <input type="text" class="col-span-5 form-control q-pair-left bg-[#F5FAFF]" value="${escapeHtml(p.left)}" placeholder="Left item ${i + 1}" required>
+                            <div class="col-span-1 text-center font-black text-[#1DC4DF]">↔</div>
+                            <input type="text" class="col-span-5 form-control q-pair-right bg-[#F5FAFF]" value="${escapeHtml(p.right)}" placeholder="Right match ${i + 1}" required>
+                            <button type="button" onclick="removePairRow(this)" class="col-span-1 py-2 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] font-black text-xs cursor-pointer">✕</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button type="button" onclick="addPairRow(this)" class="mt-2.5 px-3.5 py-1.5 rounded-xl bg-[#FFF7ED] border-2 border-[#FF8400] text-[#C2410C] font-black text-xs cursor-pointer">
+                    + Add Pair
+                </button>
+            `;
+        } else if (type === 'fill_blank') {
+            const blanks = (preset.correct_answers && preset.correct_answers.length) ? preset.correct_answers : [''];
+            body.innerHTML = `
+                <div class="p-4 rounded-2xl bg-[#FEFCE8] border-2.5 border-[#FDE047]">
+                    <div class="text-[11px] font-black text-[#854D0E] mb-2.5">
+                        ✏️ Put <code class="bg-white px-1.5 py-0.5 rounded border border-[#FDE047]">___</code> in Question Text for each blank. Separate synonyms with <code class="bg-white px-1.5 py-0.5 rounded border border-[#FDE047]">|</code>.
+                    </div>
+                    <div class="space-y-2 q-blanks-list">
+                        ${blanks.map((val, idx) => `
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-1 rounded-xl bg-[#FACC15] text-[#713F12] font-black text-xs shrink-0">Blank #${idx + 1}</span>
+                                <input type="text" class="form-control q-blank-field bg-white" value="${escapeHtml(val)}" placeholder="Answer for blank #${idx + 1}" required>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else if (type === 'short_answer') {
+            const ansVal = preset.correct_answer || (preset.correct_answers ? preset.correct_answers.join(', ') : '');
+            body.innerHTML = `
+                <div class="p-4 rounded-2xl bg-[#FAF5FF] border-2.5 border-[#D8B4FE]">
+                    <label class="form-label text-[#6B21A8] mb-1.5 block">💬 Accepted Short Answers (Comma-separated, or leave blank for open teacher check)</label>
+                    <input type="text" class="form-control q-short-field bg-white" value="${escapeHtml(ansVal)}" placeholder="e.g. Photosynthesis, plant food">
+                </div>
+            `;
+        } else if (type === 'essay') {
+            const rubricVal = preset.correct_answer || '';
+            body.innerHTML = `
+                <div class="p-4 rounded-2xl bg-[#FDF2F8] border-2.5 border-[#F9A8D4]">
+                    <label class="form-label text-[#9D174D] mb-1.5 block">📝 Essay Writing Prompt Guide / Rubric Notes (Optional)</label>
+                    <input type="text" class="form-control q-essay-field bg-white" value="${escapeHtml(rubricVal)}" placeholder="e.g. Look for 3 complete sentences explaining the water cycle...">
+                </div>
+            `;
+        }
+    }
+
+    function insertBlankIntoPrompt(btn) {
+        const card = btn.closest('.question-card');
+        const textarea = card.querySelector('.q-text-field');
+        const pos = textarea.selectionStart ?? textarea.value.length;
+        textarea.value = textarea.value.slice(0, pos) + ' ___ ' + textarea.value.slice(pos);
+        textarea.focus();
+        syncFillBlankSlots(textarea);
+    }
+
+    function syncFillBlankSlots(textarea) {
+        const card = textarea.closest('.question-card');
+        if (card.dataset.type !== 'fill_blank') return;
+        const matches = textarea.value.match(/_{3,}|\[blank\]/gi) || [];
+        const count = Math.max(1, matches.length);
+        const list = card.querySelector('.q-blanks-list');
+        const existing = Array.from(list.querySelectorAll('.q-blank-field')).map(i => i.value);
+
+        list.innerHTML = Array.from({ length: count }).map((_, idx) => `
+            <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-xl bg-[#FACC15] text-[#713F12] font-black text-xs shrink-0">Blank #${idx + 1}</span>
+                <input type="text" class="form-control q-blank-field bg-white" value="${escapeHtml(existing[idx] || '')}" placeholder="Answer for blank #${idx + 1}" required>
+            </div>
+        `).join('');
+        reindexAllCards();
+    }
+
+    function addOptRow(btn, isMulti) {
+        const list = btn.closest('.qcard-dynamic-body').querySelector('.q-opts-list');
+        const idx = list.children.length;
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 q-opt-row';
+        row.innerHTML = `
+            <input type="${isMulti ? 'checkbox' : 'radio'}" class="q-opt-correct w-5 h-5 accent-[#68CC18] cursor-pointer shrink-0" value="${idx}">
+            <input type="text" class="form-control q-opt-input bg-[#F5FAFF]" placeholder="Option ${idx + 1}" required>
+            <button type="button" onclick="removeOptRow(this)" class="px-2.5 py-2 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] font-black text-xs cursor-pointer">✕</button>
+        `;
+        list.appendChild(row);
+        reindexAllCards();
+    }
+
+    function removeOptRow(btn) {
+        const list = btn.closest('.q-opts-list');
+        if (list.children.length <= 2) return;
+        btn.closest('.q-opt-row').remove();
+        reindexAllCards();
+    }
+
+    function addPairRow(btn) {
+        const list = btn.closest('.qcard-dynamic-body').querySelector('.q-pairs-list');
+        const idx = list.children.length;
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-12 gap-2 items-center q-pair-row';
+        row.innerHTML = `
+            <input type="text" class="col-span-5 form-control q-pair-left bg-[#F5FAFF]" placeholder="Left item ${idx + 1}" required>
+            <div class="col-span-1 text-center font-black text-[#1DC4DF]">↔</div>
+            <input type="text" class="col-span-5 form-control q-pair-right bg-[#F5FAFF]" placeholder="Right match ${idx + 1}" required>
+            <button type="button" onclick="removePairRow(this)" class="col-span-1 py-2 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] font-black text-xs cursor-pointer">✕</button>
+        `;
+        list.appendChild(row);
+        reindexAllCards();
+    }
+
+    function removePairRow(btn) {
+        const list = btn.closest('.q-pairs-list');
+        if (list.children.length <= 2) return;
+        btn.closest('.q-pair-row').remove();
+        reindexAllCards();
+    }
+
+    function moveQuestionCard(btn, dir) {
+        const card = btn.closest('.question-card');
+        const container = document.getElementById('questionsContainer');
+        if (dir === -1 && card.previousElementSibling) {
+            container.insertBefore(card, card.previousElementSibling);
+        } else if (dir === 1 && card.nextElementSibling) {
+            container.insertBefore(card.nextElementSibling, card);
+        }
+        reindexAllCards();
+    }
+
+    function removeQuestionCard(btn) {
+        const container = document.getElementById('questionsContainer');
+        if (container.children.length <= 1) {
+            alert('Your quiz needs at least 1 question!');
+            return;
+        }
+        btn.closest('.question-card').remove();
+        reindexAllCards();
+    }
+
+    function reindexAllCards() {
+        const cards = document.querySelectorAll('#questionsContainer .question-card');
+        document.getElementById('totalQuestionsBadge').textContent = cards.length;
+
+        cards.forEach((card, qIdx) => {
+            const type = card.dataset.type;
+            card.querySelector('.qcard-number').textContent = `Question ${qIdx + 1}`;
+            card.querySelector('.q-type-field').name = `questions[${qIdx}][type]`;
+            card.querySelector('.q-text-field').name = `questions[${qIdx}][text]`;
+            card.querySelector('.q-diff-field').name = `questions[${qIdx}][difficulty]`;
+            card.querySelector('.q-points-field').name = `questions[${qIdx}][points]`;
+            card.querySelector('.q-time-field').name = `questions[${qIdx}][time_limit]`;
+            card.querySelector('.q-time-val-field').name = `questions[${qIdx}][time_value]`;
+            card.querySelector('.q-time-unit-field').name = `questions[${qIdx}][time_unit]`;
+
+            if (type === 'multiple_choice' || type === 'multiple_select') {
+                card.querySelectorAll('.q-opt-row').forEach((row, oIdx) => {
+                    const chk = row.querySelector('.q-opt-correct');
+                    chk.value = oIdx;
+                    chk.name = type === 'multiple_select'
+                        ? `questions[${qIdx}][correct_indices][]`
+                        : `questions[${qIdx}][correct_index]`;
+                    row.querySelector('.q-opt-input').name = `questions[${qIdx}][options][${oIdx}]`;
+                });
+            } else if (type === 'true_false') {
+                card.querySelectorAll('.q-tf-radio').forEach(r => {
+                    r.name = `questions[${qIdx}][answer]`;
+                });
+            } else if (type === 'matching') {
+                card.querySelectorAll('.q-pair-row').forEach((row, pIdx) => {
+                    row.querySelector('.q-pair-left').name = `questions[${qIdx}][pairs][${pIdx}][left]`;
+                    row.querySelector('.q-pair-right').name = `questions[${qIdx}][pairs][${pIdx}][right]`;
+                });
+            } else if (type === 'fill_blank') {
+                card.querySelectorAll('.q-blank-field').forEach((inp, bIdx) => {
+                    inp.name = `questions[${qIdx}][blanks][${bIdx}]`;
+                });
+            } else if (type === 'short_answer') {
+                const inp = card.querySelector('.q-short-field');
+                if (inp) inp.name = `questions[${qIdx}][answer]`;
+            } else if (type === 'essay') {
+                const inp = card.querySelector('.q-essay-field');
+                if (inp) inp.name = `questions[${qIdx}][answer]`;
+            }
+        });
+    }
+
+    /* =========================================================================
+       SHARED PREVIEW CARD HELPER (USED BY BOTH QUESTION BANK & AI DRAWER)
+       ========================================================================= */
+    function buildQuestionPreviewHtml(q) {
+        if (q.type === 'matching' && Array.isArray(q.matching_pairs) && q.matching_pairs.length) {
+            return `<div class="mt-1.5 flex flex-wrap gap-1.5">` +
+                q.matching_pairs.map(p => `<span class="px-2 py-0.5 rounded-lg bg-[#FFF7ED] border border-[#FED7AA] text-[11px] font-bold text-[#9A3412]">${escapeHtml(p.left)} ↔ ${escapeHtml(p.right)}</span>`).join('') +
+                `</div>`;
+        }
+        if (Array.isArray(q.options) && q.options.length) {
+            const rightSet = (q.correct_answers || (q.correct_answer ? [q.correct_answer] : [])).map(v => String(v).trim());
+            return `<div class="mt-1.5 flex flex-wrap gap-1.5">` +
+                q.options.map(opt => {
+                    const isRight = rightSet.includes(String(opt).trim());
+                    return `<span class="px-2 py-0.5 rounded-lg text-[11px] font-bold ${isRight ? 'bg-[#ECFCCB] border border-[#84CC16] text-[#365314]' : 'bg-[#F8FAFC] border border-[#E2E8F0] text-[#64748B]'}">${isRight ? '✓ ' : ''}${escapeHtml(opt)}</span>`;
+                }).join('') +
+                `</div>`;
+        }
+        if (q.type === 'true_false') {
+            const ans = q.correct_answer || (q.correct_answers && q.correct_answers[0]) || 'True';
+            return `<div class="mt-1.5"><span class="px-2 py-0.5 rounded-lg bg-[#ECFCCB] border border-[#84CC16] text-[11px] font-bold text-[#365314]">✓ ${escapeHtml(ans)}</span></div>`;
+        }
+        if (q.type === 'fill_blank' && Array.isArray(q.correct_answers) && q.correct_answers.length) {
+            return `<div class="mt-1.5 flex flex-wrap gap-1.5">` +
+                q.correct_answers.map((b, i) => `<span class="px-2 py-0.5 rounded-lg bg-[#FEF9C3] border border-[#FDE047] text-[11px] font-bold text-[#854D0E]">Blank #${i + 1}: ${escapeHtml(b)}</span>`).join('') +
+                `</div>`;
+        }
+        return '';
+    }
+
+    /* =========================================================================
+       AI QUESTION GENERATOR DRAWER
+       ========================================================================= */
+    function openAiGenerator() {
+        document.getElementById('aiGeneratorOverlay').classList.add('open');
+        renderAiTypeCounters();
+        switchAiSourceTab(aiSourceMode);
+        renderAiClassModules();
+    }
+
+    function closeAiGenerator() {
+        document.getElementById('aiGeneratorOverlay').classList.remove('open');
+    }
+
+    function switchAiSourceTab(mode) {
+        aiSourceMode = mode;
+        const compBtn = document.getElementById('aiSrcComputerBtn');
+        const clsBtn = document.getElementById('aiSrcClassBtn');
+        const compPane = document.getElementById('aiSourceComputerPane');
+        const clsPane = document.getElementById('aiSourceClassPane');
+
+        if (mode === 'computer') {
+            compBtn.classList.add('active');
+            clsBtn.classList.remove('active');
+            compPane.style.display = 'block';
+            clsPane.style.display = 'none';
+        } else {
+            clsBtn.classList.add('active');
+            compBtn.classList.remove('active');
+            clsPane.style.display = 'block';
+            compPane.style.display = 'none';
+            renderAiClassModules();
+        }
+    }
+
+    function onAiComputerFileSelected(input) {
+        const label = document.getElementById('aiComputerFileLabel');
+        if (input.files && input.files[0]) {
+            label.textContent = `✅ Selected: ${input.files[0].name}`;
+        } else {
+            label.textContent = 'Click to choose a lesson file from your computer';
+        }
+    }
+
+    function selectClassModuleForAi(moduleId) {
+        selectedClassModuleId = moduleId;
+        renderAiClassModules();
+    }
+
+    function renderAiClassModules() {
+        const container = document.getElementById('aiClassModulesList');
+        if (!container) return;
+        const keyword = (document.getElementById('aiModuleSearchInput')?.value || '').trim().toLowerCase();
+
+        if (!CLASS_MODULES.length) {
+            container.innerHTML = `
+                <div class="p-4 text-center rounded-2xl bg-[#F5FAFF] border-2 border-dashed border-[#C7E0FF]">
+                    <div class="text-xs font-extrabold text-[#4A688A]">No published files found in your classes yet. Switch to "From Computer" to upload a file!</div>
+                </div>`;
+            return;
+        }
+
+        const filtered = CLASS_MODULES.filter(m => {
+            if (!keyword) return true;
+            return (m.title || '').toLowerCase().includes(keyword)
+                || (m.file_name || '').toLowerCase().includes(keyword)
+                || (m.class_name || '').toLowerCase().includes(keyword);
+        });
+
+        if (!filtered.length) {
+            container.innerHTML = `<div class="p-3 text-center text-xs font-bold text-[#4A688A]">No class files matched your search.</div>`;
+            return;
+        }
+
+        container.innerHTML = filtered.map(m => {
+            const isSelected = Number(selectedClassModuleId) === Number(m.id);
+            return `
+                <div onclick="selectClassModuleForAi(${m.id})"
+                     class="flex items-center justify-between gap-3 p-3 rounded-2xl border-2 ${isSelected ? 'border-[#0066D6] bg-[#EBF5FF]' : 'border-[#E2E8F0] bg-white hover:border-[#38BDF8]'} cursor-pointer">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-black text-[#0D2B4E] truncate">📚 ${escapeHtml(m.title)}</div>
+                        <div class="text-[11px] font-bold text-[#4A688A] truncate">${escapeHtml(m.file_name || 'Attached Module')} • ${escapeHtml(m.class_name || 'Class')}</div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-xl text-[11px] font-black shrink-0 ${isSelected ? 'bg-[#0066D6] text-white' : 'bg-[#F5FAFF] text-[#0066D6] border border-[#C7E0FF]'}">
+                        ${isSelected ? '✓ Selected' : 'Use File'}
+                    </span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderAiTypeCounters() {
+        const grid = document.getElementById('aiTypeCountersGrid');
+        grid.innerHTML = Object.entries(TYPE_CONFIG).map(([key, meta]) => {
+            const count = aiTypeCounts[key] || 0;
+            return `
+                <div class="flex items-center justify-between gap-2 p-2.5 rounded-2xl border-2 ${count > 0 ? 'border-[#60A5FA] bg-[#F5FAFF]' : 'border-[#E2E8F0] bg-white'}">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="px-2 py-0.5 rounded-lg text-[11px] font-black shrink-0" style="background:${meta.bg};color:${meta.color};">
+                            ${meta.icon} ${meta.label}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" class="ai-stepper-btn" onclick="stepAiTypeCount('${key}', -1)">−</button>
+                        <input type="number"
+                               min="0"
+                               max="30"
+                               value="${count}"
+                               onchange="setAiTypeCount('${key}', this.value)"
+                               class="w-12 text-center font-black text-xs text-[#0D2B4E] bg-white border-2 border-[#C7E0FF] rounded-xl py-1">
+                        <button type="button" class="ai-stepper-btn" onclick="stepAiTypeCount('${key}', 1)">+</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const total = Object.values(aiTypeCounts).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
+        document.getElementById('aiRequestedTotalCount').textContent = total;
+    }
+
+    function stepAiTypeCount(typeKey, delta) {
+        const next = Math.max(0, Math.min(30, (aiTypeCounts[typeKey] || 0) + delta));
+        aiTypeCounts[typeKey] = next;
+        renderAiTypeCounters();
+    }
+
+    function setAiTypeCount(typeKey, val) {
+        aiTypeCounts[typeKey] = Math.max(0, Math.min(30, parseInt(val, 10) || 0));
+        renderAiTypeCounters();
+    }
+
+    async function runAiGeneration() {
+        const errBox = document.getElementById('aiErrorBox');
+        errBox.style.display = 'none';
+
+        const totalRequested = Object.values(aiTypeCounts).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
+        if (totalRequested < 1) {
+            errBox.textContent = '⚠️ Please choose at least 1 question across any question type.';
+            errBox.style.display = 'block';
+            return;
+        }
+
+        const fileInput = document.getElementById('aiModuleFileInput');
+        if (aiSourceMode === 'computer' && (!fileInput.files || !fileInput.files[0])) {
+            errBox.textContent = '⚠️ Please select a lesson file from your computer first.';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (aiSourceMode === 'class' && !selectedClassModuleId) {
+            errBox.textContent = '⚠️ Please select one of your published class files first.';
+            errBox.style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('btnRunAiGenerate');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Generating with Groq AI...';
+
+        try {
+            const formData = new FormData();
+            formData.append('_token', CSRF_TOKEN);
+            formData.append('class_id', document.getElementById('manualClassId')?.value || '');
+            formData.append('quiz_title', document.getElementById('quizTitleInput')?.value || 'AI Generated Quiz');
+            formData.append('subject', document.getElementById('quizSubjectInput')?.value || 'General');
+            formData.append('difficulty', document.getElementById('aiDifficultySelect')?.value || 'mixed');
+            formData.append('question_count', totalRequested);
+
+            Object.entries(aiTypeCounts).forEach(([k, v]) => {
+                formData.append(`type_counts[${k}]`, v);
+            });
+
+            if (aiSourceMode === 'computer' && fileInput.files[0]) {
+                formData.append('module_pdf', fileInput.files[0]);
+            } else if (aiSourceMode === 'class' && selectedClassModuleId) {
+                formData.append('module_id', selectedClassModuleId);
+            }
+
+            const response = await fetch(GENERATE_URL, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (!response.ok || !Array.isArray(data.questions)) {
+                throw new Error(data.message || 'Failed to generate questions from the selected file.');
+            }
+
+            aiGeneratedPool = data.questions;
+            selectedAiIndices.clear();
+            aiGeneratedPool.forEach((_, idx) => selectedAiIndices.add(idx));
+            renderAiGeneratedPreview();
+        } catch (err) {
+            errBox.textContent = '⚠️ ' + (err.message || 'An error occurred while generating questions.');
+            errBox.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    function toggleAiItem(idx) {
+        if (selectedAiIndices.has(idx)) selectedAiIndices.delete(idx);
+        else selectedAiIndices.add(idx);
+        updateAiSelectionFooter();
+    }
+
+    function toggleAllAiGenerated(checked) {
+        selectedAiIndices.clear();
+        if (checked) {
+            aiGeneratedPool.forEach((_, idx) => selectedAiIndices.add(idx));
+        }
+        renderAiGeneratedPreview();
+    }
+
+    function updateAiSelectionFooter() {
+        const count = selectedAiIndices.size;
+        document.getElementById('aiSelectedCount').textContent = count;
+        document.getElementById('btnPasteAiQuestions').disabled = count === 0;
+        const selectAllChk = document.getElementById('aiSelectAllCheckbox');
+        if (selectAllChk) {
+            selectAllChk.checked = aiGeneratedPool.length > 0 && count === aiGeneratedPool.length;
+        }
+    }
+
+    function renderAiGeneratedPreview() {
+        const section = document.getElementById('aiResultsSection');
+        const list = document.getElementById('aiGeneratedList');
+        section.style.display = 'block';
+        document.getElementById('aiGeneratedResultCount').textContent = aiGeneratedPool.length;
+
+        list.innerHTML = aiGeneratedPool.map((q, idx) => {
+            const meta = TYPE_CONFIG[q.type] || TYPE_CONFIG.multiple_choice;
+            const isChecked = selectedAiIndices.has(idx);
+            const preview = buildQuestionPreviewHtml(q);
+
+            return `
+                <label class="flex items-start gap-3 p-3 rounded-2xl border-2 ${isChecked ? 'border-[#0066D6] bg-[#EBF5FF]' : 'border-[#E2E8F0] bg-white hover:border-[#38BDF8]'} cursor-pointer">
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleAiItem(${idx})" class="mt-1 w-4 h-4 accent-[#0066D6] shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded-lg text-[11px] font-black" style="background:${meta.bg};color:${meta.color};">
+                                ${meta.icon} ${meta.label}
+                            </span>
+                            <span class="text-[11px] font-black text-[#4A688A]">⭐ ${q.points || 100} XP</span>
+                        </div>
+                        <div class="text-sm font-extrabold text-[#0D2B4E]">${escapeHtml(q.prompt || q.question)}</div>
+                        ${preview}
+                    </div>
+                </label>
+            `;
+        }).join('');
+
+        updateAiSelectionFooter();
+    }
+
+    function pasteSelectedAiQuestions() {
+        if (!selectedAiIndices.size) return;
+
+        const container = document.getElementById('questionsContainer');
+        if (container.children.length === 1) {
+            const firstText = container.querySelector('.q-text-field')?.value.trim();
+            if (!firstText) container.innerHTML = '';
+        }
+
+        aiGeneratedPool.forEach((q, idx) => {
+            if (selectedAiIndices.has(idx)) {
+                addQuestionCard({
+                    ...q,
+                    fromAi: true,
+                });
+            }
+        });
+
+        closeAiGenerator();
+    }
+
+    /* =========================================================================
+       PER-QUIZ SEARCHABLE QUESTION BANK DRAWER
+       ========================================================================= */
+    function openQuestionBank() {
+        document.getElementById('questionBankOverlay').classList.add('open');
+        renderQuestionBank();
+    }
+
+    function closeQuestionBank() {
+        document.getElementById('questionBankOverlay').classList.remove('open');
+    }
+
+    function setBankFilter(type, btn) {
+        activeBankFilter = type;
+        document.querySelectorAll('#bankTypeFilters .type-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderQuestionBank();
+    }
+
+    function toggleBankItem(qId) {
+        if (selectedBankIds.has(qId)) selectedBankIds.delete(qId);
+        else selectedBankIds.add(qId);
+        document.getElementById('bankSelectedCount').textContent = selectedBankIds.size;
+    }
+
+    function toggleEntireQuizBank(quizId, checked) {
+        const quiz = QUESTION_BANK.find(q => q.id === quizId);
+        if (!quiz) return;
+        quiz.questions.forEach(q => {
+            if (checked) selectedBankIds.add(q.id);
+            else selectedBankIds.delete(q.id);
+        });
+        document.getElementById('bankSelectedCount').textContent = selectedBankIds.size;
+        renderQuestionBank();
+    }
+
+    function clearBankSelection() {
+        selectedBankIds.clear();
+        document.getElementById('bankSelectedCount').textContent = '0';
+        renderQuestionBank();
+    }
+
+    function renderQuestionBank() {
+        const container = document.getElementById('bankQuizzesList');
+        const keyword = (document.getElementById('bankSearchInput').value || '').trim().toLowerCase();
+
+        if (!QUESTION_BANK.length) {
+            container.innerHTML = `
+                <div class="p-8 text-center bg-white rounded-3xl border-3 border-dashed border-[#C7E0FF]">
+                    <div class="text-4xl mb-2">📭</div>
+                    <h3 class="font-display text-lg text-[#0D2B4E]">No Published Quizzes Found</h3>
+                    <p class="text-xs font-bold text-[#5A7696] mt-1">Publish a quiz first and its questions will appear here separated by quiz.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '';
+        QUESTION_BANK.forEach(quiz => {
+            const quizMatchesKeyword = quiz.title.toLowerCase().includes(keyword)
+                || (quiz.subject || '').toLowerCase().includes(keyword)
+                || (quiz.class_name || '').toLowerCase().includes(keyword);
+
+            const filteredQuestions = quiz.questions.filter(q => {
+                const typeOk = activeBankFilter === 'all' || q.type === activeBankFilter;
+                if (!typeOk) return false;
+                if (!keyword || quizMatchesKeyword) return true;
+
+                const inPrompt = (q.prompt || '').toLowerCase().includes(keyword);
+                const inOptions = (q.options || []).some(o => String(o).toLowerCase().includes(keyword));
+                const inPairs = (q.matching_pairs || []).some(p =>
+                    String(p.left).toLowerCase().includes(keyword) || String(p.right).toLowerCase().includes(keyword)
+                );
+                return inPrompt || inOptions || inPairs;
+            });
+
+            if (!filteredQuestions.length) return;
+
+            const allQuizChecked = filteredQuestions.every(q => selectedBankIds.has(q.id));
+
+            html += `
+                <details open class="bg-white rounded-3xl border-2.5 border-[#C7E0FF] shadow-xs overflow-hidden">
+                    <summary class="p-4 bg-[#EBF5FF] cursor-pointer flex items-center justify-between gap-3">
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-display text-base font-bold text-[#0D2B4E]">📘 ${escapeHtml(quiz.title)}</span>
+                                <span class="px-2.5 py-0.5 rounded-full bg-white border border-[#93C5FD] text-[#0066D6] text-[11px] font-black">${escapeHtml(quiz.subject)}</span>
+                                <span class="px-2.5 py-0.5 rounded-full bg-[#ECFCCB] border border-[#BEF264] text-[#3E8708] text-[11px] font-black">${escapeHtml(quiz.class_name)}</span>
+                            </div>
+                            <div class="text-[11px] font-bold text-[#4A688A] mt-0.5">
+                                ${filteredQuestions.length} question(s) • Published ${escapeHtml(quiz.published_at)}
+                            </div>
+                        </div>
+
+                        <label onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border-2 border-[#93C5FD] text-xs font-black text-[#0066D6] cursor-pointer shrink-0">
+                            <input type="checkbox" ${allQuizChecked ? 'checked' : ''} onchange="toggleEntireQuizBank(${quiz.id}, this.checked)" class="w-4 h-4 accent-[#0066D6]">
+                            <span>Select All</span>
+                        </label>
+                    </summary>
+
+                    <div class="p-4 space-y-2.5 border-t border-[#C7E0FF]">
+                        ${filteredQuestions.map(q => {
+                            const meta = TYPE_CONFIG[q.type] || TYPE_CONFIG.multiple_choice;
+                            const isChecked = selectedBankIds.has(q.id);
+                            const preview = buildQuestionPreviewHtml(q);
+
+                            return `
+                                <label class="flex items-start gap-3 p-3 rounded-2xl border-2 ${isChecked ? 'border-[#0066D6] bg-[#EBF5FF]' : 'border-[#E2E8F0] bg-white hover:border-[#38BDF8]'} cursor-pointer">
+                                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleBankItem(${q.id})" class="mt-1 w-4 h-4 accent-[#0066D6] shrink-0">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="px-2 py-0.5 rounded-lg text-[11px] font-black" style="background:${meta.bg};color:${meta.color};">
+                                                ${meta.icon} ${meta.label}
+                                            </span>
+                                            <span class="text-[11px] font-black text-[#4A688A]">⭐ ${q.points} XP</span>
+                                        </div>
+                                        <div class="text-sm font-extrabold text-[#0D2B4E]">${escapeHtml(q.prompt)}</div>
+                                        ${preview}
+                                    </div>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </details>
+            `;
+        });
+
+        container.innerHTML = html || `
+            <div class="p-8 text-center bg-white rounded-3xl border-3 border-dashed border-[#C7E0FF]">
+                <div class="text-3xl mb-2">🔎</div>
+                <p class="text-sm font-black text-[#0D2B4E]">No questions matched your search filter.</p>
+            </div>`;
+    }
+
+    function importSelectedFromBank() {
+        if (!selectedBankIds.size) {
+            alert('Check at least one question from the Question Bank first.');
+            return;
+        }
+
+        const container = document.getElementById('questionsContainer');
+        if (container.children.length === 1) {
+            const firstText = container.querySelector('.q-text-field')?.value.trim();
+            if (!firstText) container.innerHTML = '';
+        }
+
+        QUESTION_BANK.forEach(quiz => {
+            quiz.questions.forEach(q => {
+                if (selectedBankIds.has(q.id)) {
+                    addQuestionCard({
+                        type: q.type,
+                        prompt: q.prompt,
+                        options: q.options,
+                        correct_answer: q.correct_answer,
+                        correct_answers: q.correct_answers,
+                        matching_pairs: q.matching_pairs,
+                        difficulty: q.difficulty,
+                        points: q.points,
+                        time_limit: q.time_limit,
+                        fromQuiz: quiz.title,
+                    });
+                }
+            });
+        });
+
+        clearBankSelection();
+        closeQuestionBank();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (Array.isArray(INITIAL_QUESTIONS) && INITIAL_QUESTIONS.length > 0) {
+            INITIAL_QUESTIONS.forEach(q => addQuestionCard(q));
+        } else {
+            addQuestionCard({ type: 'multiple_choice' });
+        }
+
+        if (PRESELECTED_MODULE_ID) {
+            openAiGenerator();
+        }
+    });
 </script>
 @endpush

@@ -18,20 +18,24 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'email' => ['required', 'email'],
+            'password' => ['required'],
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended('/dashboard');
+
+            if (Auth::user()->isAdmin()) {
+                return redirect()->route('admin.dashboard');
+            }
+
+            // Regular users go here
+            return redirect()->intended(route('dashboard'));
         }
 
-        return back()->withInput($request->only('email'))
-            ->with('active_tab', 'login')
-            ->withErrors([
-                'email' => 'The provided credentials do not match our records.',
-            ]);
+        return back()->withErrors([
+            'email' => 'The provided credentials do not match our records.',
+        ])->onlyInput('email');
     }
 
     public function showRegister()

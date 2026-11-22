@@ -17,6 +17,8 @@ class Quiz extends Model
         'published_at',
         'deadline_at',
         'max_attempts',
+        'is_published',
+        'status',
     ];
 
     protected function casts(): array
@@ -25,7 +27,30 @@ class Quiz extends Model
             'config'       => 'array',
             'published_at' => 'datetime',
             'deadline_at'  => 'datetime',
+            'is_published' => 'boolean',
         ];
+    }
+
+    public function isPublished(): bool
+    {
+        if (array_key_exists('is_published', $this->attributes) && $this->attributes['is_published'] !== null) {
+            return (bool) $this->attributes['is_published'];
+        }
+
+        if (array_key_exists('status', $this->attributes) && $this->attributes['status'] !== null) {
+            return $this->attributes['status'] === 'published';
+        }
+
+        if (is_array($this->config) && array_key_exists('is_draft', $this->config)) {
+            return !$this->config['is_draft'] && $this->published_at !== null;
+        }
+
+        return $this->published_at !== null;
+    }
+
+    public function isDraft(): bool
+    {
+        return !$this->isPublished();
     }
 
     public function classroom()

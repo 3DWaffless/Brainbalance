@@ -1,73 +1,105 @@
+{{-- FILE: resources/views/quiz/history.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Quiz History - BrainBalance')
+@section('title', 'Quiz History - ' . config('app.name', 'BrainBalance'))
 
 @section('content')
-<div class="topbar">
-    <div>
-        <div style="font-size: 11px; font-weight: 800; color: #aaa; text-transform: uppercase;">Learner Records</div>
-        <div class="tgreet" style="color: #FF6B6B;">📜 My Quiz History</div>
-        <div class="tsub">Review past attempts, track your XP earnings, and learn from mistakes.</div>
+<div class="flex flex-col gap-6 sm:gap-8 w-full">
+    <!-- Header -->
+    <div class="card-tactile flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+         style="background: linear-gradient(135deg, #EBF5FF 0%, #FFFFFF 55%, #FEF9C3 100%) !important;">
+        <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white border border-sky-200 text-[10px] font-black text-brand-coral uppercase tracking-wider mb-1">
+                📜 Explorer Logbook
+            </div>
+            <h1 class="font-display text-2xl md:text-3xl font-bold text-brand-text flex items-center gap-2">
+                My Quiz History 🏆
+            </h1>
+            <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
+                Review past quests, check your XP stars, and learn from every question.
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ route('quiz.index') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
+                ⚔️ Play New Quest
+            </a>
+            <a href="{{ route('dashboard') }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
+                &larr; Dashboard
+            </a>
+        </div>
     </div>
-    <a href="{{ route('dashboard') }}" class="btn-ghost">&larr; Back to Dashboard</a>
-</div>
 
-<div class="dashboard-grid">
-    <div class="col-12 card">
-        <div class="card-title" style="margin-bottom: 20px;">
-            <span>🏆 Completed Assignments ({{ $attempts->total() }})</span>
+    <!-- Completed Assignments Card -->
+    <div class="card-tactile">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b-4 border-dashed border-brand-border">
+            <h2 class="font-display text-lg sm:text-xl font-bold text-brand-text flex items-center gap-2">
+                ✅ Completed Quests
+            </h2>
+            <span class="px-3 py-1 rounded-full bg-lime-100 border border-lime-300 text-lime-800 font-black text-xs">
+                {{ $attempts->total() }} Total
+            </span>
         </div>
 
         @if($attempts->count() > 0)
-            <div class="item-list">
+            <div class="flex flex-col gap-4">
                 @foreach($attempts as $attempt)
                     @php
                         $quiz = $attempt->quiz;
+                        $subjKey = strtolower($quiz->subject ?? '');
                         $subjectName = ucfirst($quiz->subject ?? 'General');
-                        $subjectIcon = match(strtolower($quiz->subject ?? '')) {
-                            'math', 'mathematics' => '📐',
-                            'science' => '🧪',
-                            'english', 'reading' => '📖',
-                            default => '💡',
-                        };
-                        $accuracy = $attempt->total_questions > 0 ? round(($attempt->score / $attempt->total_questions) * 100) : 0;
-                    @endphp
 
-                    <div class="item-card" style="padding: 16px; border: 2px solid #FFE4C4; border-radius: 16px; background: #FFF8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <div>
-                            <div style="font-size: 16px; font-weight: 900; color: #2D2D2D; display: flex; align-items: center; gap: 8px;">
-                                {{ $quiz->title ?? 'Untitled Quiz' }}
-                                <span style="background: #FFE4C4; color: #FF6B6B; font-weight: 900; font-size: 11px; padding: 3px 10px; border-radius: 50px; border: 1.5px solid #FFD1A4;">
-                                    {{ $subjectIcon }} {{ $subjectName }}
-                                </span>
+                        $subjectBadge = match(true) {
+                            str_contains($subjKey, 'math') => ['icon' => '🔢', 'classes' => 'bg-sky-100 text-brand-coral border-sky-200'],
+                            str_contains($subjKey, 'eng') || str_contains($subjKey, 'read') => ['icon' => '📖', 'classes' => 'bg-lime-100 text-lime-800 border-lime-300'],
+                            str_contains($subjKey, 'sci') => ['icon' => '🔬', 'classes' => 'bg-purple-100 text-purple-800 border-purple-200'],
+                            default => ['icon' => '📝', 'classes' => 'bg-amber-100 text-amber-900 border-amber-200'],
+                        };
+
+                        $accuracy = $attempt->total_questions > 0 ? round(($attempt->score / $attempt->total_questions) * 100) : 0;
+                        $rankIcon = $accuracy >= 90 ? '🥇' : ($accuracy >= 70 ? '🥈' : '⭐');
+                    @endphp
+                    <div class="card-tactile-interactive flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div class="flex items-start gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-white border-2 border-brand-border flex items-center justify-center text-2xl shrink-0 shadow-2xs">
+                                {{ $rankIcon }}
                             </div>
-                            <div style="font-size: 12px; font-weight: 700; color: #aaa; margin-top: 4px;">
-                                Class: {{ $quiz->classroom->name ?? 'Unknown' }} &bull; 
-                                Completed: {{ $attempt->created_at->format('M d, Y g:i A') }} &bull; 
-                                Time: {{ floor($attempt->time_taken_seconds / 60) }}m {{ $attempt->time_taken_seconds % 60 }}s
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-base sm:text-lg font-black text-brand-text">
+                                        {{ $quiz->title ?? 'Untitled Quiz' }}
+                                    </h3>
+                                    <span class="{{ $subjectBadge['classes'] }} border font-black text-xs px-3 py-0.5 rounded-full">
+                                        {{ $subjectBadge['icon'] }} {{ $subjectName }}
+                                    </span>
+                                </div>
+                                <p class="text-xs font-bold text-slate-500 mt-1">
+                                    🏫 {{ $quiz->classroom->name ?? 'Unknown' }} &bull;
+                                    📅 {{ $attempt->created_at->format('M d, Y g:i A') }} &bull;
+                                    ⏱️ {{ floor(($attempt->time_taken_seconds ?? 0) / 60) }}m {{ ($attempt->time_taken_seconds ?? 0) % 60 }}s
+                                </p>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 16px;">
-                            {{-- Stats Pill --}}
-                            <div style="display: flex; gap: 12px; background: #fff; padding: 8px 14px; border-radius: 12px; border: 2px solid #FFE4C4; text-align: center;">
+                        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+                            <!-- Stats Pill -->
+                            <div class="flex items-center gap-4 bg-white px-4 py-2.5 rounded-2xl border-3 border-brand-border text-center">
                                 <div>
-                                    <div style="font-size: 14px; font-weight: 900; color: #2D2D2D;">{{ $attempt->score }}/{{ $attempt->total_questions }}</div>
-                                    <div style="font-size: 10px; font-weight: 800; color: #aaa;">Score</div>
+                                    <div class="text-sm font-black text-brand-text">{{ $attempt->score }}/{{ $attempt->total_questions }}</div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase">Score</div>
                                 </div>
-                                <div style="border-left: 1px solid #FFE4C4;"></div>
+                                <div class="h-7 w-0.5 bg-brand-border"></div>
                                 <div>
-                                    <div style="font-size: 14px; font-weight: 900; color: #4ECDC4;">{{ $accuracy }}%</div>
-                                    <div style="font-size: 10px; font-weight: 800; color: #aaa;">Accuracy</div>
+                                    <div class="text-sm font-black text-brand-teal">{{ $accuracy }}%</div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase">Accuracy</div>
                                 </div>
-                                <div style="border-left: 1px solid #FFE4C4;"></div>
+                                <div class="h-7 w-0.5 bg-brand-border"></div>
                                 <div>
-                                    <div style="font-size: 14px; font-weight: 900; color: #FFD166;">+{{ $attempt->total_xp }}</div>
-                                    <div style="font-size: 10px; font-weight: 800; color: #aaa;">XP</div>
+                                    <div class="text-sm font-black text-brand-amber">+{{ $attempt->total_xp }}</div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase">XP</div>
                                 </div>
                             </div>
 
-                            <a href="{{ route('quiz.review', $attempt->id) }}" class="btn-teal" style="padding: 8px 16px; font-size: 13px; text-decoration: none;">
+                            <a href="{{ route('quiz.review', $attempt->id) }}" class="btn-tactile-teal text-xs py-2.5 px-4">
                                 🔍 Review Answers
                             </a>
                         </div>
@@ -75,14 +107,19 @@
                 @endforeach
             </div>
 
-            <div style="margin-top: 20px;">
+            <div class="mt-6">
                 {{ $attempts->links() }}
             </div>
         @else
-            <div class="empty-state" style="padding: 3rem 1rem; text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">📜</div>
-                <div style="font-size: 16px; font-weight: 900; color: #2D2D2D;">No Quiz History Yet</div>
-                <p style="font-size: 13px; color: #aaa; font-weight: 700; margin-top: 4px;">Complete your assigned quizzes to see your scores and answer breakdowns here!</p>
+            <div class="text-center py-12">
+                <div class="text-5xl mb-3">📭</div>
+                <h3 class="font-display text-xl font-bold text-brand-text">No Quiz History Yet</h3>
+                <p class="text-xs sm:text-sm font-bold text-slate-400 mt-1 mb-5">
+                    Complete your assigned quizzes to see your scores and answer breakdowns here!
+                </p>
+                <a href="{{ route('quiz.index') }}" class="btn-tactile-primary text-xs py-2.5 px-5">
+                    Browse Quizzes 🚀
+                </a>
             </div>
         @endif
     </div>

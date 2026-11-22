@@ -10,19 +10,30 @@ class Module extends Model
     use HasFactory;
 
     protected $fillable = [
-        'class_id', // <-- Added to allow saving
-        'topic_id',
+        'class_id',
         'title',
-        'description',
-        'file_path',
         'file_name',
-        'file_size',
+        'file_path',
         'file_type',
+        'file_size',
     ];
 
-    public function topic()
+    /**
+     * Dynamically convert raw bytes to KB or MB for UI rendering.
+     */
+    public function getFormattedSizeAttribute(): string
     {
-        return $this->belongsTo(Topic::class);
+        $bytes = (int) $this->file_size;
+
+        if ($bytes <= 0) {
+            return 'N/A';
+        }
+
+        if ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 1) . ' MB';
+        }
+
+        return number_format($bytes / 1024, 0) . ' KB';
     }
 
     public function classroom()

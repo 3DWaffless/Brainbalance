@@ -1,175 +1,138 @@
+{{-- FILE: resources/views/auth/register.blade.php --}}
 @extends('layouts.auth')
 
-@section('title', 'Sign up')
+@section('title', 'Sign up - BrainBalance')
 
 @section('content')
-
-    <h1 class="auth-heading">Join BrainBalance</h1>
-
-    <div style="text-align:center; margin-bottom:1.25rem;">
-        <span class="xp-badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-            +50 XP on first login
+<div class="w-full">
+    <div class="text-center mb-5">
+        <span id="register-badge" class="inline-flex items-center gap-1.5 bg-[#E6F7FC] border-2 border-[#99E2F5] text-[#0066D6] font-black text-[11px] uppercase tracking-wider px-3.5 py-1 rounded-full mb-2">
+            🎒 Student Quest Account
         </span>
+        <h1 id="register-heading" class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">Join BrainBalance!</h1>
     </div>
 
-    <form method="POST" action="{{ route('register') }}" id="register-form">
+    <form method="POST" action="{{ route('register.store') }}" id="register-form" class="flex flex-col gap-3.5">
         @csrf
 
-        {{-- Role selector --}}
-        <div class="auth-field">
-            <span class="auth-label">I am a...</span>
-            <div class="role-grid">
-                <div class="role-btn selected" id="role-student" onclick="selectRole('student')">
-                    <div class="role-emoji">🧠</div>
-                    <div class="role-name">Student</div>
-                    <div class="role-desc">Learn &amp; earn XP</div>
-                </div>
-                <div class="role-btn" id="role-teacher" onclick="selectRole('teacher')">
-                    <div class="role-emoji">📚</div>
-                    <div class="role-name">Teacher</div>
-                    <div class="role-desc">Manage classes</div>
-                </div>
+        <div>
+            <span class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1.5">I am a...</span>
+            @php $selectedRole = old('role', 'student'); @endphp
+            <div class="grid grid-cols-2 gap-3">
+                <button type="button" id="role-student" onclick="selectRole('student')"
+                    class="p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer {{ $selectedRole === 'student' ? 'border-[#0066D6] bg-[#E0F7FC] shadow-[0_4px_0_#7DD3FC] -translate-y-0.5' : 'border-[#B8E2F8] bg-[#F2FAFF]' }}">
+                    <div class="text-2xl mb-0.5">🎒</div>
+                    <div class="font-black text-sm text-[#0D2B4E]">Student</div>
+                    <div class="text-[11px] font-bold text-[#5A7696]">Learn &amp; earn medals</div>
+                </button>
+                <button type="button" id="role-teacher" onclick="selectRole('teacher')"
+                    class="p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer {{ $selectedRole === 'teacher' ? 'border-[#55B310] bg-[#ECFCCB] shadow-[0_4px_0_#A3E635] -translate-y-0.5' : 'border-[#B8E2F8] bg-[#F2FAFF]' }}">
+                    <div class="text-2xl mb-0.5">🧑‍🏫</div>
+                    <div class="font-black text-sm text-[#0D2B4E]">Teacher</div>
+                    <div class="text-[11px] font-bold text-[#5A7696]">Manage classes</div>
+                </button>
             </div>
-            <input type="hidden" name="role" id="role-input" value="student">
+            <input type="hidden" name="role" id="role-input" value="{{ $selectedRole }}">
         </div>
 
-        {{-- Name row --}}
-        <div class="name-grid" style="margin-bottom:1rem;">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-                <label for="first_name" class="auth-label">First name</label>
-                <div class="auth-input-wrap">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <circle cx="12" cy="8" r="4"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                    </svg>
-                    <input
-                        id="first_name"
-                        name="first_name"
-                        type="text"
-                        class="auth-input {{ $errors->has('first_name') ? 'is-invalid' : '' }}"
-                        value="{{ old('first_name') }}"
-                        placeholder="Maria"
-                        required
-                        autofocus
-                        autocomplete="given-name"
-                    >
-                </div>
-                @error('first_name')
-                    <span class="auth-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div>
-                <label for="last_name" class="auth-label">Last name</label>
-                <div class="auth-input-wrap">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <circle cx="12" cy="8" r="4"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                    </svg>
-                    <input
-                        id="last_name"
-                        name="last_name"
-                        type="text"
-                        class="auth-input {{ $errors->has('last_name') ? 'is-invalid' : '' }}"
-                        value="{{ old('last_name') }}"
-                        placeholder="Santos"
-                        required
-                        autocomplete="family-name"
-                    >
-                </div>
-                @error('last_name')
-                    <span class="auth-error">{{ $message }}</span>
-                @enderror
-            </div>
-        </div>
-
-        {{-- Email --}}
-        <div class="auth-field">
-            <label for="email" class="auth-label">Email</label>
-            <div class="auth-input-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <rect x="2" y="4" width="20" height="16" rx="2"/>
-                    <path d="M2 7l10 7 10-7"/>
-                </svg>
+                <label for="first_name" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">First name</label>
                 <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    class="auth-input {{ $errors->has('email') ? 'is-invalid' : '' }}"
-                    value="{{ old('email') }}"
-                    placeholder="you@school.edu"
+                    id="first_name"
+                    name="first_name"
+                    type="text"
+                    value="{{ old('first_name') }}"
+                    placeholder="Maria"
                     required
-                    autocomplete="username"
+                    autofocus
+                    autocomplete="given-name"
+                    class="w-full h-[48px] px-4 rounded-[16px] border-[3px] {{ $errors->has('first_name') ? 'border-[#FF8400]' : 'border-[#B8E2F8]' }} bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors"
                 >
+                @error('first_name')
+                    <span class="text-xs font-black text-[#D96B00] mt-1 block">{{ $message }}</span>
+                @enderror
             </div>
+
+            <div>
+                <label for="last_name" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Last name</label>
+                <input
+                    id="last_name"
+                    name="last_name"
+                    type="text"
+                    value="{{ old('last_name') }}"
+                    placeholder="Santos"
+                    required
+                    autocomplete="family-name"
+                    class="w-full h-[48px] px-4 rounded-[16px] border-[3px] {{ $errors->has('last_name') ? 'border-[#FF8400]' : 'border-[#B8E2F8]' }} bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors"
+                >
+                @error('last_name')
+                    <span class="text-xs font-black text-[#D96B00] mt-1 block">{{ $message }}</span>
+                @enderror
+            </div>
+        </div>
+
+        <div>
+            <label for="email" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Email</label>
+            <input
+                id="email"
+                name="email"
+                type="email"
+                value="{{ old('email') }}"
+                placeholder="you@school.edu"
+                required
+                autocomplete="username"
+                class="w-full h-[48px] px-4 rounded-[16px] border-[3px] {{ $errors->has('email') ? 'border-[#FF8400]' : 'border-[#B8E2F8]' }} bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors"
+            >
             @error('email')
-                <span class="auth-error">{{ $message }}</span>
+                <span class="text-xs font-black text-[#D96B00] mt-1 block">{{ $message }}</span>
             @enderror
         </div>
 
-        {{-- Password --}}
-        <div class="auth-field">
-            <label for="password" class="auth-label">Password</label>
-            <div class="auth-input-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label for="password" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Password</label>
                 <input
                     id="password"
                     name="password"
                     type="password"
-                    class="auth-input {{ $errors->has('password') ? 'is-invalid' : '' }}"
                     placeholder="Min. 8 characters"
                     required
                     autocomplete="new-password"
+                    class="w-full h-[48px] px-4 rounded-[16px] border-[3px] {{ $errors->has('password') ? 'border-[#FF8400]' : 'border-[#B8E2F8]' }} bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors"
                 >
+                @error('password')
+                    <span class="text-xs font-black text-[#D96B00] mt-1 block">{{ $message }}</span>
+                @enderror
             </div>
-            @error('password')
-                <span class="auth-error">{{ $message }}</span>
-            @enderror
-        </div>
 
-        {{-- Confirm password --}}
-        <div class="auth-field">
-            <label for="password_confirmation" class="auth-label">Confirm password</label>
-            <div class="auth-input-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
+            <div>
+                <label for="password_confirmation" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Confirm password</label>
                 <input
                     id="password_confirmation"
                     name="password_confirmation"
                     type="password"
-                    class="auth-input {{ $errors->has('password_confirmation') ? 'is-invalid' : '' }}"
-                    placeholder="Repeat your password"
+                    placeholder="Repeat password"
                     required
                     autocomplete="new-password"
+                    class="w-full h-[48px] px-4 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors"
                 >
             </div>
-            @error('password_confirmation')
-                <span class="auth-error">{{ $message }}</span>
-            @enderror
         </div>
 
-        <button type="submit" class="auth-btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <path d="M15 14l5-5-5-5"/>
-                <path d="M20 9H9a4 4 0 0 0-4 4v7"/>
-            </svg>
-            Create account
+        <button type="submit" id="register-submit-btn" style="background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);" class="w-full h-[54px] px-5 rounded-[20px] text-white font-black text-base border-2 border-[#004FA8] shadow-[0_6px_0_#004FA8] hover:brightness-105 active:translate-y-1 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1">
+            🚀 Start Learning
         </button>
     </form>
 
-    <div class="auth-divider">or</div>
+    <div class="relative flex py-4 items-center">
+        <div class="grow border-t-2 border-dashed border-[#B8E2F8]"></div>
+        <span class="shrink mx-3 text-xs font-black text-[#8BA8C7] uppercase tracking-wider">or</span>
+        <div class="grow border-t-2 border-dashed border-[#B8E2F8]"></div>
+    </div>
 
-    {{-- Google OAuth --}}
-    <a href="{{ route('auth.google') }}" class="auth-btn-google">
-        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+    <a href="{{ route('auth.google') }}" class="w-full h-[50px] px-5 rounded-[18px] bg-white hover:bg-[#F2FAFF] text-[#0D2B4E] font-black text-sm border-[3px] border-[#B8E2F8] shadow-[0_4px_0_#D4F1FC] active:translate-y-0.5 transition-all flex items-center justify-center gap-2.5 no-underline">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
@@ -178,22 +141,55 @@
         Continue with Google
     </a>
 
-    <p class="auth-terms">
-        By signing up you agree to our
-        <a href="{{ route('terms') }}">Terms of Service</a> and
-        <a href="{{ route('privacy') }}">Privacy Policy</a>.
+    <p class="text-center text-xs sm:text-sm font-extrabold text-[#5A7696] mt-4">
+        Already have an account? <a href="{{ route('login') }}" class="font-black text-[#0066D6] hover:underline">Log in &rarr;</a>
     </p>
+</div>
 
-    <p class="auth-footer">
-        Already have an account? <a href="{{ route('login') }}">Log in</a>
-    </p>
+@push('scripts')
+<script>
+    function selectRole(role) {
+        const isTeacher = role === 'teacher';
+        document.body.classList.toggle('theme-teacher', isTeacher);
+        document.body.classList.toggle('theme-student', !isTeacher);
 
-    <script>
-        function selectRole(role) {
-            document.getElementById('role-student').classList.toggle('selected', role === 'student');
-            document.getElementById('role-teacher').classList.toggle('selected', role === 'teacher');
-            document.getElementById('role-input').value = role;
+        const studentBtn = document.getElementById('role-student');
+        const teacherBtn = document.getElementById('role-teacher');
+        const badge = document.getElementById('register-badge');
+        const submitBtn = document.getElementById('register-submit-btn');
+
+        studentBtn.className = !isTeacher
+            ? 'p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer border-[#0066D6] bg-[#E0F7FC] shadow-[0_4px_0_#7DD3FC] -translate-y-0.5'
+            : 'p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer border-[#BEF264] bg-[#F7FEE7]';
+
+        teacherBtn.className = isTeacher
+            ? 'p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer border-[#55B310] bg-[#ECFCCB] shadow-[0_4px_0_#A3E635] -translate-y-0.5'
+            : 'p-3 rounded-[20px] border-[3px] text-center transition-all cursor-pointer border-[#B8E2F8] bg-[#F2FAFF]';
+
+        if (isTeacher) {
+            badge.textContent = '🧑‍🏫 Teacher Classroom Account';
+            badge.style.background = '#ECFCCB';
+            badge.style.borderColor = '#A3E635';
+            badge.style.color = '#3E8708';
+            submitBtn.style.background = 'linear-gradient(135deg, #55B310 0%, #68CC18 100%)';
+            submitBtn.style.borderColor = '#3E8708';
+            submitBtn.style.boxShadow = '0 6px 0 #3E8708';
+            submitBtn.textContent = '🏫 Create Teacher Account';
+        } else {
+            badge.textContent = '🎒 Student Quest Account';
+            badge.style.background = '#E6F7FC';
+            badge.style.borderColor = '#99E2F5';
+            badge.style.color = '#0066D6';
+            submitBtn.style.background = 'linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%)';
+            submitBtn.style.borderColor = '#004FA8';
+            submitBtn.style.boxShadow = '0 6px 0 #004FA8';
+            submitBtn.textContent = '🚀 Start Learning';
         }
-    </script>
 
+        document.getElementById('role-input').value = role;
+    }
+
+    selectRole(document.getElementById('role-input').value || 'student');
+</script>
+@endpush
 @endsection

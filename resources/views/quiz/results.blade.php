@@ -1,96 +1,105 @@
+{{-- FILE: resources/views/quiz/results.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Class Analytics & Diagnostics - BrainBalance')
 
 @section('content')
-<div class="topbar">
-    <div>
-        <div style="font-size: 11px; font-weight: 800; color: #aaa; text-transform: uppercase;">Teacher Command Center</div>
-        <div class="tgreet" style="color: #FF6B6B;">📊 Class Performance & Weak Topic Diagnostics</div>
-        <div class="tsub">Track student quiz results, identify struggling topics, and measure engagement.</div>
-    </div>
-    <a href="{{ route('dashboard') }}" class="btn-ghost">&larr; Back to Dashboard</a>
-</div>
-
-<div class="dashboard-grid">
-    {{-- KPI Cards --}}
-    <div class="col-12" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 10px;">
-        <div class="card" style="text-align: center; margin-bottom: 0;">
-            <div class="card-sub">Total Submissions</div>
-            <div style="font-size: 28px; font-weight: 900; color: #FF6B6B; margin-top: 4px;">{{ $totalAttempts }}</div>
+<div class="flex flex-col gap-6 sm:gap-8 w-full">
+    <div class="card-tactile relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="bb-spectrum-bar absolute top-0 left-0 right-0"></div>
+        <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#ECFCCB] border-2 border-[#A3E635] text-[#3E8708] font-black text-[11px] uppercase tracking-wider mb-1.5">
+                🧑‍🏫 Teacher Command Center
+            </div>
+            <h1 class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">
+                Class Performance &amp; Weak Topic Diagnostics 📊
+            </h1>
+            <p class="text-xs sm:text-sm font-bold text-[#5A7696] mt-1">
+                Track student quiz results, identify struggling topics, and measure engagement.
+            </p>
         </div>
-        <div class="card" style="text-align: center; margin-bottom: 0;">
-            <div class="card-sub">Average Score</div>
-            <div style="font-size: 28px; font-weight: 900; color: #4ECDC4; margin-top: 4px;">{{ $avgScore }} pts</div>
-        </div>
-        <div class="card" style="text-align: center; margin-bottom: 0;">
-            <div class="card-sub">Overall Accuracy</div>
-            <div style="font-size: 28px; font-weight: 900; color: #FFB347; margin-top: 4px;">{{ $overallAccuracy }}%</div>
-        </div>
+        <a href="{{ route('dashboard') }}" class="btn-tactile-ghost shrink-0">&larr; Back to Dashboard</a>
     </div>
 
-    {{-- Weak Topic Diagnostics --}}
-    <div class="col-8 card">
-        <div class="card-title" style="margin-bottom: 15px;">
-            <span>⚠️ Weak Topic Diagnostics (Lowest Accuracy Tiers)</span>
+    {{-- Spectrum KPI Cards --}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <div class="card-tactile text-center border-[#93C5FD]" style="background: linear-gradient(135deg, #EBF5FF 0%, #E0F7FC 100%);">
+            <div class="text-xs font-black text-[#0066D6] uppercase tracking-wider">Total Submissions</div>
+            <div class="font-display text-3xl font-bold text-[#0066D6] mt-1">{{ $totalAttempts }}</div>
         </div>
-
-        @if(!empty($topicStats))
-            <div class="item-list">
-                @foreach($topicStats as $topicName => $stats)
-                    @php
-                        $topicAccuracy = $stats['total'] > 0 ? round(($stats['correct'] / $stats['total']) * 100) : 0;
-                        $color = $topicAccuracy < 50 ? '#E74C3C' : ($topicAccuracy < 75 ? '#FFB347' : '#2ECC71');
-                    @endphp
-                    <div style="padding: 14px; border: 2px solid #FFE4C4; border-radius: 12px; background: #FFF8F0; margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <span style="font-size: 15px; font-weight: 900; color: #2D2D2D;">{{ $topicName }}</span>
-                            <span style="font-size: 13px; font-weight: 900; color: {{ $color }};">{{ $topicAccuracy }}% Correct</span>
-                        </div>
-
-                        {{-- Progress Bar --}}
-                        <div style="height: 10px; background: #FFE4C4; border-radius: 50px; overflow: hidden;">
-                            <div style="width: {{ $topicAccuracy }}%; height: 100%; background: {{ $color }}; border-radius: 50px;"></div>
-                        </div>
-
-                        <div style="font-size: 11px; font-weight: 700; color: #aaa; margin-top: 6px;">
-                            Based on {{ $stats['total'] }} answered questions in this topic.
-                            @if($topicAccuracy < 50)
-                                <strong style="color: #E74C3C;">Recommendation: Upload a supplementary review module.</strong>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <div class="empty-state" style="padding: 2rem 1rem;">
-                <p style="font-size:13px; color:#aaa; font-weight:700;">No diagnostic data collected yet.</p>
-            </div>
-        @endif
+        <div class="card-tactile text-center border-[#A3E635]" style="background: linear-gradient(135deg, #F4FCE3 0%, #ECFCCB 100%);">
+            <div class="text-xs font-black text-[#3E8708] uppercase tracking-wider">Average Score</div>
+            <div class="font-display text-3xl font-bold text-[#3E8708] mt-1">{{ $avgScore }} pts</div>
+        </div>
+        <div class="card-tactile text-center border-[#FDBA74]" style="background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);">
+            <div class="text-xs font-black text-[#C2410C] uppercase tracking-wider">Overall Accuracy</div>
+            <div class="font-display text-3xl font-bold text-[#C2410C] mt-1">{{ $overallAccuracy }}%</div>
+        </div>
     </div>
 
-    {{-- Recent Submissions --}}
-    <div class="col-4 card">
-        <div class="card-title" style="margin-bottom: 15px;"><span>📜 Recent Submissions</span></div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {{-- Weak Topic Diagnostics --}}
+        <div class="lg:col-span-8 card-tactile">
+            <h2 class="font-display text-lg sm:text-xl font-bold text-[#0D2B4E] mb-4 pb-3 border-b-2 border-dashed border-[#B8E2F8]">
+                🎯 Weak Topic Diagnostics (Lowest Accuracy Tiers)
+            </h2>
 
-        @if($sessions->count() > 0)
-            <div class="item-list">
-                @foreach($sessions->take(8) as $s)
-                    <div style="padding: 10px 12px; border: 1px solid #FFE4C4; border-radius: 10px; font-size: 13px; background: #fff; margin-bottom: 8px;">
-                        <div style="font-weight: 900; color: #2D2D2D;">
-                            {{ $s->student->first_name ?? 'Student' }} {{ $s->student->last_name ?? '' }}
+            @if(!empty($topicStats))
+                <div class="flex flex-col gap-3.5">
+                    @foreach($topicStats as $topicName => $stats)
+                        @php
+                            $topicAccuracy = $stats['total'] > 0 ? round(($stats['correct'] / $stats['total']) * 100) : 0;
+                            $barColor = $topicAccuracy < 50 ? '#FF8400' : ($topicAccuracy < 75 ? '#1DC4DF' : '#68CC18');
+                        @endphp
+                        <div class="p-4 border-[3px] border-[#B8E2F8] rounded-2xl bg-[#F2FAFF]">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-black text-sm sm:text-base text-[#0D2B4E]">{{ $topicName }}</span>
+                                <span class="text-xs sm:text-sm font-black" style="color: {{ $barColor }};">{{ $topicAccuracy }}% Correct</span>
+                            </div>
+                            <div class="h-3 bg-[#E0F2FE] rounded-full overflow-hidden border border-[#BAE6FD]">
+                                <div style="width: {{ $topicAccuracy }}%; height: 100%; background: {{ $barColor }}; border-radius: 999px;"></div>
+                            </div>
+                            <div class="text-xs font-bold text-[#5A7696] mt-2">
+                                Based on {{ $stats['total'] }} answered questions in this topic.
+                                @if($topicAccuracy < 50)
+                                    <strong class="text-[#C2410C]">Recommendation: Upload a supplementary review module.</strong>
+                                @endif
+                            </div>
                         </div>
-                        <div style="font-size: 11px; font-weight: 700; color: #aaa; margin-top: 2px;">
-                            {{ $s->quiz->title ?? 'Quiz' }} &bull; Score: {{ $s->score }}/{{ $s->total_questions }} (+{{ $s->total_xp }} XP)
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-10 bg-[#F2FAFF] rounded-2xl border-2 border-dashed border-[#B8E2F8]">
+                    <p class="text-xs sm:text-sm text-[#5A7696] font-extrabold">No diagnostic data collected yet.</p>
+                </div>
+            @endif
+        </div>
+
+        {{-- Recent Submissions --}}
+        <div class="lg:col-span-4 card-tactile">
+            <h2 class="font-display text-lg sm:text-xl font-bold text-[#0D2B4E] mb-4 pb-3 border-b-2 border-dashed border-[#B8E2F8]">
+                🕒 Recent Submissions
+            </h2>
+
+            @if($sessions->count() > 0)
+                <div class="flex flex-col gap-2.5">
+                    @foreach($sessions->take(8) as $s)
+                        <div class="p-3 border-2 border-[#B8E2F8] rounded-2xl bg-[#F2FAFF]">
+                            <div class="font-black text-xs sm:text-sm text-[#0D2B4E]">
+                                {{ $s->student->first_name ?? 'Student' }} {{ $s->student->last_name ?? '' }}
+                            </div>
+                            <div class="text-[11px] font-bold text-[#5A7696] mt-0.5">
+                                {{ $s->quiz->title ?? 'Quiz' }} &bull; Score: <span class="text-[#0066D6] font-black">{{ $s->score }}/{{ $s->total_questions }}</span> (+{{ $s->total_xp }} XP)
+                            </div>
                         </div>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <div class="empty-state" style="padding: 2rem 1rem;">
-                <p style="font-size:13px; color:#aaa; font-weight:700;">No quiz attempts logged yet.</p>
-            </div>
-        @endif
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-10 bg-[#F2FAFF] rounded-2xl border-2 border-dashed border-[#B8E2F8]">
+                    <p class="text-xs sm:text-sm text-[#5A7696] font-extrabold">No quiz attempts logged yet.</p>
+                </div>
+            @endif
+        </div>
     </div>
 </div>
 @endsection

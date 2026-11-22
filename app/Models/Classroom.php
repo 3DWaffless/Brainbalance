@@ -13,18 +13,32 @@ class Classroom extends Model
 
     protected $fillable = [
         'teacher_id',
-        'class_name',
+        'name',
         'subject',
+        'section',
         'class_code',
-        'grade_level',
-        'description',
+        'code',
     ];
 
+    /**
+     * Get the announcements posted in this classroom.
+     */
+    public function announcements()
+    {
+        return $this->hasMany(Announcement::class, 'class_id')->latest();
+    }
+
+    /**
+     * Get the teacher that owns the classroom.
+     */
     public function teacher()
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
+    /**
+     * The students enrolled in the classroom.
+     */
     public function students()
     {
         return $this->belongsToMany(User::class, 'class_student', 'class_id', 'student_id')
@@ -32,18 +46,19 @@ class Classroom extends Model
                     ->withTimestamps();
     }
 
-    public function topics()
-    {
-        return $this->hasMany(Topic::class, 'class_id');
-    }
-
-    public function modules()
-    {
-        return $this->hasMany(Module::class, 'class_id');
-    }
-
+    /**
+     * The quizzes assigned to this classroom.
+     */
     public function quizzes()
     {
         return $this->hasMany(Quiz::class, 'class_id');
+    }
+
+    /**
+     * The learning modules uploaded to this classroom.
+     */
+    public function modules()
+    {
+        return $this->hasMany(Module::class, 'class_id');
     }
 }

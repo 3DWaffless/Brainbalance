@@ -3,239 +3,135 @@
 
 @section('title', 'Settings - ' . config('app.name', 'BrainBalance'))
 
-@push('styles')
-<style>
-    .card.danger { border-color: #F5C6CB; }
-    .card-title.danger { color: #e74c3c; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .form-error { font-size: 11px; font-weight: 700; color: #e74c3c; margin-top: 4px; display: block; }
-    .form-hint { font-size: 11px; font-weight: 700; color: #bbb; margin-top: 4px; display: block; }
-    .divider { border: none; border-top: 2px dashed #FFE4C4; margin: 18px 0; }
-    .role-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        background: #FFE4C4;
-        color: #FF6B6B;
-        margin-left: 6px;
-    }
-    .avatar-upload-wrap {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 16px;
-        padding-bottom: 16px;
-        border-bottom: 2px dashed #FFE4C4;
-    }
-    .avatar-preview {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        background: #FF6B6B;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 26px;
-        font-weight: 900;
-        border: 3px solid #FFE4C4;
-        object-fit: cover;
-        box-shadow: 0 4px 10px rgba(255, 107, 107, 0.15);
-        flex-shrink: 0;
-    }
-    .btn-danger-solid {
-        background: #e74c3c; color: #fff;
-        border: none; padding: 10px 20px;
-        border-radius: 12px; font-size: 13px; font-weight: 900;
-        font-family: 'Nunito', sans-serif; cursor: pointer;
-        display: inline-flex; align-items: center; gap: 6px;
-        transition: background 0.15s;
-    }
-    .btn-danger-solid:hover { background: #c0392b; }
-    .modal-overlay {
-        display: none; position: fixed; inset: 0;
-        background: rgba(0,0,0,0.4); z-index: 100;
-        align-items: center; justify-content: center;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-        background: #fff; border-radius: 20px;
-        padding: 24px; width: 100%; max-width: 420px;
-        border: 2px solid #FFE4C4;
-    }
-    .modal-title { font-size: 17px; font-weight: 900; color: #2D2D2D; margin-bottom: 6px; }
-    .modal-sub { font-size: 12px; font-weight: 700; color: #999; margin-bottom: 16px; }
-    .modal-close { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
-</style>
-@endpush
-
 @section('content')
-<div class="topbar">
-    <div>
-        <div class="tgreet">Settings ⚙️</div>
-        <div class="tsub">Manage your account information and preferences</div>
-    </div>
-</div>
+<div class="flex flex-col gap-6 sm:gap-8 w-full">
 
-{{-- UPDATE PROFILE --}}
-<div class="card" style="max-width: 720px;">
-    <div class="card-header">
+    <!-- Page Header -->
+    <div class="card-tactile relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="bb-spectrum-bar absolute top-0 left-0 right-0"></div>
         <div>
-            <div class="card-title">
-                <span>Your Information 👤</span>
-                <span class="role-badge">{{ ucfirst(Auth::user()->role) }} Account</span>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E6F7FC] border-2 border-[#99E2F5] text-[#0066D6] font-black text-[11px] uppercase tracking-wider mb-1.5">
+                ⚙️ Account Preferences
             </div>
-            <div class="card-sub">Update your profile picture, name, email, or password</div>
+            <h1 class="font-display text-2xl md:text-3xl font-bold text-[#0D2B4E] flex items-center gap-2 mt-0.5">
+                Settings
+            </h1>
+            <p class="text-xs sm:text-sm font-extrabold text-[#5A7696] mt-1">
+                Manage your profile photo, name, email, and security preferences.
+            </p>
         </div>
+        <span class="bg-[#ECFCCB] text-[#3E8708] border-2 border-[#A3E635] text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider">
+            {{ ucfirst(Auth::user()->role ?? 'Student') }} Account
+        </span>
     </div>
-    
-    <form method="POST" action="{{ route('profile.update') }}" enctype="multipart/form-data">
-        @csrf
-        @method('PUT')
 
-        {{-- AVATAR UPLOAD --}}
-        <div class="avatar-upload-wrap">
-            @if(Auth::user()->avatar_url)
-                <img src="{{ Auth::user()->avatar_url }}" id="avatarPreview" class="avatar-preview" alt="Profile Picture">
-            @else
-                <div id="avatarInitials" class="avatar-preview">
-                    {{ Auth::user()->initials }}
+    @if ($errors->any())
+        <div class="card-tactile bg-[#FFF7ED] border-[#FB923C]">
+            <ul class="list-disc list-inside text-xs sm:text-sm font-black text-[#9A3412] space-y-1">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Main Information Form (8 Cols) -->
+        <div class="lg:col-span-8 card-tactile">
+            <div class="mb-6 pb-3 border-b-2 border-dashed border-[#B8E2F8]">
+                <h2 class="font-display text-lg font-bold text-[#0D2B4E]">Your Information 👤</h2>
+                <p class="text-xs font-bold text-[#5A7696] mt-0.5">Update your profile picture, name, email, or password</p>
+            </div>
+
+            <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-5">
+                @csrf
+                @method('PATCH')
+
+                <!-- Profile Picture -->
+                <div>
+                    <label class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-2">Profile Picture</label>
+                    <div class="flex flex-wrap items-center gap-5 bg-[#F2FAFF] border-[3px] border-[#B8E2F8] rounded-2xl p-4">
+                        @if(Auth::user()->avatar_url)
+                            <img src="{{ Auth::user()->avatar_url }}" class="w-20 h-20 rounded-full border-4 border-[#38BDF8] object-cover shadow-md shrink-0" alt="Profile Avatar">
+                        @else
+                            <div class="w-20 h-20 rounded-full text-white border-4 border-[#BAE6FD] flex items-center justify-center text-2xl font-black shadow-md shrink-0"
+                                 style="background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);">
+                                {{ strtoupper(substr(Auth::user()->first_name ?? Auth::user()->name, 0, 1)) }}{{ strtoupper(substr(Auth::user()->last_name ?? '', 0, 1)) }}
+                            </div>
+                        @endif
+
+                        <div class="flex-1 min-w-[200px]">
+                            <input type="file" name="avatar" accept="image/*" class="w-full text-xs font-bold text-[#5A7696] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-2 file:border-[#99E2F5] file:text-xs file:font-black file:bg-[#E6F7FC] file:text-[#0066D6] hover:file:bg-[#CFFAFE] cursor-pointer">
+                            <p class="text-[11px] font-bold text-[#5A7696] mt-1.5">JPG, PNG, or GIF up to 2MB.</p>
+                        </div>
+                    </div>
                 </div>
-                <img id="avatarPreview" class="avatar-preview" style="display:none;" alt="Profile Picture">
-            @endif
 
-            <div style="flex:1">
-                <label class="form-label">Profile Picture</label>
-                <input type="file" name="avatar" id="avatarInput" accept="image/*" style="font-size:12px">
-                @error('avatar') <span class="form-error">{{ $message }}</span> @enderror
-                <span class="form-hint">JPG, PNG, or GIF up to 2MB.</span>
-            </div>
+                <!-- Name Fields -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="first_name" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">First name</label>
+                        <input type="text" id="first_name" name="first_name" value="{{ old('first_name', Auth::user()->first_name ?? Auth::user()->name) }}" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors" required>
+                    </div>
+
+                    <div>
+                        <label for="last_name" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Last name</label>
+                        <input type="text" id="last_name" name="last_name" value="{{ old('last_name', Auth::user()->last_name) }}" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors">
+                    </div>
+                </div>
+
+                <!-- Email Field -->
+                <div>
+                    <label for="email" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Email address</label>
+                    <input type="email" id="email" name="email" value="{{ old('email', Auth::user()->email) }}" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors" required>
+                </div>
+
+                <hr class="border-t-2 border-dashed border-[#B8E2F8] my-1">
+
+                <!-- Password Fields -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="password" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">New password</label>
+                        <input type="password" id="password" name="password" placeholder="Leave blank to keep current" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors">
+                    </div>
+
+                    <div>
+                        <label for="password_confirmation" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Confirm new password</label>
+                        <input type="password" id="password_confirmation" name="password_confirmation" placeholder="Repeat new password" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors">
+                    </div>
+                </div>
+
+                <!-- Current Password Field -->
+                <div>
+                    <label for="current_password" class="block text-[11px] font-black text-[#3E5A7A] uppercase tracking-wider mb-1">Current password</label>
+                    <input type="password" id="current_password" name="current_password" placeholder="Required to change email or password" class="w-full px-4 py-3 rounded-[16px] border-[3px] border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E] focus:outline-none focus:border-[#0066D6] focus:bg-white transition-colors">
+                    <p class="text-[11px] font-bold text-[#5A7696] mt-1">Only required if you are updating your email address or password.</p>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button type="submit" class="btn-tactile-primary">
+                        ✓ Save changes
+                    </button>
+                </div>
+            </form>
         </div>
 
-        <div class="form-grid">
-            <div class="form-field">
-                <label class="form-label">First name</label>
-                <input name="first_name" type="text" class="form-input {{ $errors->has('first_name') ? 'is-invalid' : '' }}" value="{{ old('first_name', $user->first_name) }}" required>
-                @error('first_name') <span class="form-error">{{ $message }}</span> @enderror
-            </div>
-            <div class="form-field">
-                <label class="form-label">Last name</label>
-                <input name="last_name" type="text" class="form-input {{ $errors->has('last_name') ? 'is-invalid' : '' }}" value="{{ old('last_name', $user->last_name) }}" required>
-                @error('last_name') <span class="form-error">{{ $message }}</span> @enderror
-            </div>
-        </div>
+        <!-- Danger Zone Column (4 Cols) -->
+        <div class="lg:col-span-4 card-tactile border-[#FDBA74] bg-[#FFF7ED]/70 shadow-[0_8px_0_#FED7AA]">
+            <h3 class="font-display text-lg font-bold text-[#C2410C] mb-2">Danger zone ⚠️</h3>
+            <p class="text-xs font-bold text-[#5A7696] leading-relaxed mb-5">
+                Permanently delete your account and all associated data. This action cannot be undone.
+            </p>
 
-        <div class="form-field">
-            <label class="form-label">Email address</label>
-            <input name="email" type="email" class="form-input {{ $errors->has('email') ? 'is-invalid' : '' }}" value="{{ old('email', $user->email) }}" required>
-            @error('email') <span class="form-error">{{ $message }}</span> @enderror
+            <form action="{{ route('profile.destroy') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone.')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="w-full bg-[#FF8400] hover:bg-[#D96B00] text-white font-black text-xs sm:text-sm py-3 px-4 rounded-2xl border-2 border-[#D96B00] shadow-[0_4px_0_#D96B00] active:translate-y-0.5 transition-all cursor-pointer">
+                    🗑️ Delete my account
+                </button>
+            </form>
         </div>
-
-        <hr class="divider">
-
-        <div class="form-grid">
-            <div class="form-field">
-                <label class="form-label">New password</label>
-                <input name="password" type="password" class="form-input {{ $errors->has('password') ? 'is-invalid' : '' }}" placeholder="Leave blank to keep current password">
-                @error('password') <span class="form-error">{{ $message }}</span> @enderror
-            </div>
-            <div class="form-field">
-                <label class="form-label">Confirm new password</label>
-                <input name="password_confirmation" type="password" class="form-input" placeholder="Repeat new password">
-            </div>
-        </div>
-
-        <div class="form-field">
-            <label class="form-label">Current password</label>
-            <input name="current_password" type="password" class="form-input {{ $errors->has('current_password') ? 'is-invalid' : '' }}" placeholder="Required to change email or password">
-            @error('current_password') <span class="form-error">{{ $message }}</span> @enderror
-            <span class="form-hint">Only required if you are updating your email address or password.</span>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end;margin-top:8px">
-            <button type="submit" class="btn-primary">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-                Save changes
-            </button>
-        </div>
-    </form>
-</div>
-
-{{-- DANGER ZONE --}}
-<div class="card danger" style="max-width: 720px;">
-    <div class="card-header">
-        <div>
-            <div class="card-title danger">Danger zone ⚠️</div>
-            <div class="card-sub">Permanently delete your account and all associated data</div>
-        </div>
-    </div>
-    <button class="btn-danger-solid" onclick="openModal('modal-delete')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-        Delete my account
-    </button>
-</div>
-
-{{-- DELETE ACCOUNT MODAL --}}
-<div class="modal-overlay" id="modal-delete">
-    <div class="modal">
-        <button class="modal-close" onclick="closeModal('modal-delete')">×</button>
-        <div class="modal-title">Delete your account?</div>
-        <div class="modal-sub">
-            @if(Auth::user()->isTeacher())
-                This will permanently remove your teacher profile, created classes, uploaded modules, and quizzes. This action cannot be undone.
-            @else
-                This will permanently remove your student account, class enrollments, quiz history, and badges. This action cannot be undone.
-            @endif
-        </div>
-        <form method="POST" action="{{ route('profile.destroy') }}">
-            @csrf
-            @method('DELETE')
-            <div class="form-field">
-                <label class="form-label">Enter your password to confirm</label>
-                <input name="current_password" type="password" class="form-input {{ $errors->has('current_password') ? 'is-invalid' : '' }}" placeholder="Your password" required>
-                @error('current_password') <span class="form-error">{{ $message }}</span> @enderror
-            </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
-                <button type="button" class="btn-ghost" onclick="closeModal('modal-delete')">Cancel</button>
-                <button type="submit" class="btn-danger-solid">Permanently delete</button>
-            </div>
-        </form>
     </div>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-    function openModal(id) { document.getElementById(id).classList.add('open'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', function(e) {
-            if (e.target === this) this.classList.remove('open');
-        });
-    });
-
-    // Live Avatar Preview
-    document.getElementById('avatarInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const imgPreview = document.getElementById('avatarPreview');
-                const initialsDiv = document.getElementById('avatarInitials');
-                
-                imgPreview.src = e.target.result;
-                imgPreview.style.display = 'block';
-                if (initialsDiv) initialsDiv.style.display = 'none';
-            }
-            reader.readAsDataURL(file);
-        }
-    });
-
-    @if($errors->has('current_password') && old('_method') === 'DELETE')
-        openModal('modal-delete');
-    @endif
-</script>
-@endpush

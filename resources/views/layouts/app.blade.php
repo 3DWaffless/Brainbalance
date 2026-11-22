@@ -1,358 +1,414 @@
+{{-- FILE: resources/views/layouts/app.blade.php --}}
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('app.name', 'BrainBalance'))</title>
-    
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('css/brainbalance-theme.css') }}">
     <style>
-        /* --- KID-FRIENDLY TACTILE UI OVERRIDES --- */
-
-        /* 1. Playful Chunky Buttons with 3D Depth */
-        .btn-primary {
-            background: #FF6B6B !important;
-            color: #fff !important;
-            border: none !important;
-            border-radius: 16px !important;
-            padding: 12px 22px !important;
-            font-size: 14px !important;
-            font-weight: 900 !important;
-            box-shadow: 0 5px 0 #D94848 !important; /* Thick bottom lip */
-            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        }
-        .btn-primary:hover {
-            background: #ff5252 !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 7px 0 #D94848 !important;
-        }
-        .btn-primary:active {
-            transform: translateY(4px) !important;
-            box-shadow: 0 1px 0 #D94848 !important;
+        :root {
+            --bb-blue: #0066D6;
+            --bb-blue-dark: #004FA8;
+            --bb-cyan: #1DC4DF;
+            --bb-cyan-dark: #0E9EB8;
+            --bb-lime: #68CC18;
+            --bb-lime-dark: #4FA30D;
+            --bb-orange: #FF8400;
+            --bb-orange-dark: #D96B00;
+            --bb-spectrum: linear-gradient(90deg, #0066D6 0%, #1DC4DF 33%, #68CC18 68%, #FF8400 100%);
         }
 
-        .btn-teal {
-            background: #4ECDC4 !important;
-            color: #fff !important;
-            border: none !important;
-            border-radius: 16px !important;
-            padding: 12px 22px !important;
-            font-size: 14px !important;
-            font-weight: 900 !important;
-            box-shadow: 0 5px 0 #32B3A9 !important;
-            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        }
-        .btn-teal:hover {
-            background: #3dbcb3 !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 7px 0 #32B3A9 !important;
-        }
-        .btn-teal:active {
-            transform: translateY(4px) !important;
-            box-shadow: 0 1px 0 #32B3A9 !important;
+        body {
+            font-family: 'Nunito', sans-serif;
+            color: #0D2B4E;
+            background-color: #F5FAFF;
+            background-image:
+                radial-gradient(at 6% 8%, rgba(0, 102, 214, 0.14) 0px, transparent 42%),
+                radial-gradient(at 45% 4%, rgba(29, 196, 223, 0.16) 0px, transparent 42%),
+                radial-gradient(at 92% 14%, rgba(104, 204, 24, 0.15) 0px, transparent 44%),
+                radial-gradient(at 86% 86%, rgba(255, 132, 0, 0.14) 0px, transparent 46%),
+                radial-gradient(#CBE6FF 2px, transparent 2px);
+            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 34px 34px;
         }
 
-        .btn-ghost {
-            background: #fff !important;
-            color: #FF6B6B !important;
-            border-radius: 16px !important;
-            border: 3px solid #FFE4C4 !important;
-            box-shadow: 0 4px 0 #FFE4C4 !important;
-            font-weight: 900 !important;
-            transition: all 0.1s ease !important;
-        }
-        .btn-ghost:hover {
-            background: #FFF0E0 !important;
-        }
-        .btn-ghost:active {
-            transform: translateY(3px) !important;
-            box-shadow: 0 1px 0 #FFE4C4 !important;
+        .font-display { font-family: 'Fredoka', 'Nunito', sans-serif; }
+
+        .bb-spectrum-bar {
+            height: 6px;
+            width: 100%;
+            background: var(--bb-spectrum);
+            flex-shrink: 0;
         }
 
-        .btn-danger {
-            background: transparent !important;
-            color: #e74c3c !important;
-            border: 2px solid #F8D7DA !important;
-            padding: 6px 12px !important;
-            border-radius: 12px !important;
-            font-size: 11px !important;
-            font-weight: 900 !important;
-            font-family: 'Nunito', sans-serif !important;
-            cursor: pointer !important;
-            transition: background 0.15s !important;
+        @keyframes xpShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
-        .btn-danger:hover {
-            background: #F8D7DA !important;
+        .bb-xp-fill {
+            background: linear-gradient(90deg, #0066D6 0%, #1DC4DF 35%, #68CC18 70%, #FF8400 100%);
+            background-size: 200% 100%;
+            animation: xpShimmer 4s linear infinite;
         }
 
-        /* 2. Toy-Like Playful Cards & Classroom Cards */
-        .card, .item-card, .class-card {
-            border-radius: 22px !important;
-            border: 3px solid #FFE4C4 !important;
-            box-shadow: 0 8px 0 #FFE4C4 !important; /* Thick bottom edge */
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease !important;
+        .bb-sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            font-weight: 800;
+            font-size: 14.5px;
+            color: #4A688A;
+            border: 2.5px solid transparent;
+            transition: all 0.16s ease;
+            text-decoration: none;
+        }
+        .bb-sidebar-link:hover {
+            background-color: #F2FAFF;
+            color: #0066D6;
+            border-color: #D4F1FC;
+            transform: translateY(-1px);
         }
 
-        .card:hover, .item-card:hover, .class-card:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 11px 0 #FFD1A4 !important;
+        .bb-nav-active-blue {
+            background: linear-gradient(135deg, #EBF5FF 0%, #E0F7FC 100%);
+            color: #0066D6;
+            border-color: #38BDF8;
+            box-shadow: 0 4px 0 #BAE6FD;
+            font-weight: 900;
         }
-
-        .card:active, .item-card:active, .class-card:active {
-            transform: translateY(4px) !important;
-            box-shadow: 0 2px 0 #FFD1A4 !important;
+        .bb-nav-active-lime {
+            background: linear-gradient(135deg, #F4FCE3 0%, #ECFCCB 100%);
+            color: #3E8708;
+            border-color: #68CC18;
+            box-shadow: 0 4px 0 #D9F99D;
+            font-weight: 900;
         }
-
-        /* 3. Chunky Form Inputs */
-        .form-input, .form-textarea {
-            border-radius: 16px !important;
-            border: 3px solid #FFE4C4 !important;
-            background: #FFF8F0 !important;
-            font-weight: 800 !important;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03) !important;
+        .bb-nav-active-orange {
+            background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+            color: #C2410C;
+            border-color: #FF8400;
+            box-shadow: 0 4px 0 #FED7AA;
+            font-weight: 900;
         }
-        .form-input:focus, .form-textarea:focus {
-            border-color: #FF6B6B !important;
-            background: #fff !important;
-            box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.15) !important;
+        .bb-nav-active-cyan {
+            background: linear-gradient(135deg, #ECFEFF 0%, #CFFAFE 100%);
+            color: #0E7490;
+            border-color: #1DC4DF;
+            box-shadow: 0 4px 0 #A5F3FC;
+            font-weight: 900;
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Nunito', sans-serif; background: #FFF8F0; min-height: 100vh; display: flex; flex-direction: column; color: #2D2D2D; }
-
-        .mobile-header { display: none; background: #fff; padding: 12px 20px; border-bottom: 2px solid #FFE4C4; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
-        .mobile-brand { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 16px; }
-        .toggle-btn { background: #FFF0E0; border: 2px solid #FFE4C4; border-radius: 10px; padding: 6px 10px; font-size: 18px; cursor: pointer; color: #FF6B6B; }
-
-        .layout-container { display: flex; flex: 1; min-height: 100vh; position: relative; }
-        .sidebar { width: 240px; background: #fff; border-right: 2px solid #FFE4C4; display: flex; flex-direction: column; padding: 1.25rem 0.75rem; flex-shrink: 0; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; transition: transform 0.25s ease-in-out; }
-        
-        .profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 1.25rem; border-bottom: 2px solid #FFE4C4; margin-bottom: 1rem; }
-        .profile-avatar { width: 72px; height: 72px; border-radius: 50%; background: #FF6B6B; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; border: 3px solid #FFE4C4; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(255, 107, 107, 0.15); object-fit: cover; }
-        .profile-name { font-weight: 900; font-size: 15px; color: #2D2D2D; line-height: 1.2; word-break: break-word; }
-        .profile-role { font-size: 11px; font-weight: 800; color: #FF6B6B; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
-
-        .sb-nav { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-        .sb-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 800; color: #888; text-decoration: none; transition: all 0.15s ease; }
-        .sb-item:hover { background: #FFF0E0; color: #FF6B6B; }
-        .sb-item.active { background: #FFE4C4; color: #FF6B6B; }
-        .sb-item svg { width: 20px; height: 20px; flex-shrink: 0; }
-
-        .sb-bottom { border-top: 2px solid #FFE4C4; padding-top: 0.75rem; margin-top: auto; }
-        .logout-btn { width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #FFE4C4; background: #fff; color: #FF6B6B; font-size: 13px; font-weight: 900; font-family: 'Nunito', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s ease; }
-        .logout-btn:hover { background: #FFF0E0; }
-
-        .main-content { margin-left: 240px; flex: 1; padding: 2rem; width: calc(100% - 240px); transition: all 0.25s ease-in-out; }
-        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; gap: 12px; flex-wrap: wrap; }
-        .tgreet { font-weight: 900; font-size: 24px; color: #2D2D2D; }
-        .tsub { font-size: 14px; color: #888; font-weight: 700; margin-top: 2px; }
-
-        /* Shared UI Elements */
-        .dashboard-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
-        .col-8 { grid-column: span 8; }
-        .col-4 { grid-column: span 4; }
-        .col-12 { grid-column: span 12; }
-        
-        .card { background: #fff; border-radius: 18px; padding: 20px; border: 2px solid #FFE4C4; box-shadow: 0 2px 8px rgba(0,0,0,0.02); margin-bottom: 20px; }
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-        .card-title { font-size: 16px; font-weight: 900; color: #2D2D2D; display: flex; align-items: center; justify-content: space-between; width: 100%; }
-        .card-sub { font-size: 12px; font-weight: 700; color: #aaa; margin-top: 2px; }
-
-        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 90; }
-
-        @media (max-width: 992px) {
-            .col-8, .col-4 { grid-column: span 12; }
-        }
-        @media (max-width: 768px) {
-            .mobile-header { display: flex; }
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.show { transform: translateX(0); }
-            .sidebar-overlay.show { display: block; }
-            .main-content { margin-left: 0; width: 100%; padding: 1.25rem; }
+        .bb-nav-active-purple {
+            background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
+            color: #5B21B6;
+            border-color: #8B5CF6;
+            box-shadow: 0 4px 0 #DDD6FE;
+            font-weight: 900;
         }
     </style>
     @stack('styles')
 </head>
-<body>
+<body class="h-full font-sans antialiased selection:bg-[#1DC4DF] selection:text-white flex flex-col min-h-[100dvh] {{ (Auth::check() && Auth::user()->isStudent()) ? 'theme-student' : 'theme-teacher' }}">
+    @php
+        $isStudent = Auth::check() && Auth::user()->isStudent();
+        $userXp = Auth::check() ? (Auth::user()->total_xp ?? 0) : 0;
+        $userLevel = Auth::check() ? (Auth::user()->level ?? ((int) floor($userXp / 1000) + 1)) : 1;
+        $xpInLevel = $userXp % 1000;
+        $xpPercent = min(100, max(12, round(($xpInLevel / 1000) * 100)));
 
-<header class="mobile-header">
-    <div class="mobile-brand">
-        <span style="background:#FF6B6B;color:#fff;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px">🧠</span>
-        BrainBalance
-    </div>
-    <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Navigation">☰</button>
-</header>
+        $pendingAssignmentsCount = 0;
+        if ($isStudent && \Illuminate\Support\Facades\Schema::hasColumn('announcements', 'type') && \Illuminate\Support\Facades\Schema::hasTable('assignment_submissions')) {
+            $joinedIds = Auth::user()->joinedClasses()->pluck('classes.id');
+            if ($joinedIds->isNotEmpty()) {
+                $submittedIds = \App\Models\AssignmentSubmission::where('student_id', Auth::id())->pluck('announcement_id');
+                $pendingAssignmentsCount = \App\Models\Announcement::whereIn('class_id', $joinedIds)
+                    ->where('type', 'assignment')
+                    ->whereNotIn('id', $submittedIds)
+                    ->count();
+            }
+        }
+    @endphp
 
-<div class="layout-container">
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-    @auth
-    <aside class="sidebar" id="sidebar">
-        <div class="profile-card">
-            @if(Auth::user()->avatar_url)
-                <img src="{{ Auth::user()->avatar_url }}" class="profile-avatar" alt="Profile Picture">
-            @else
-                <div class="profile-avatar">
-                    {{ Auth::user()->initials }}
+    <!-- Mobile Navigation Header -->
+    <header class="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-[3px] border-[#D4F1FC] shadow-xs">
+        <div class="bb-spectrum-bar"></div>
+        <div class="px-4 py-3 flex justify-between items-center">
+            <x-brand-logo :href="Auth::check() ? route('dashboard') : url('/')" :size="38" :text-size="20" />
+            @auth
+                <div class="flex items-center gap-2">
+                    @if($isStudent)
+                        <span class="px-2.5 py-1 rounded-full bg-[#FFF7ED] border-2 border-[#FF8400] text-[#C2410C] font-black text-xs">
+                            ⭐ Lv.{{ $userLevel }}
+                        </span>
+                    @endif
+                    <button type="button" onclick="toggleSidebar()" aria-label="Toggle Navigation" class="w-11 h-11 bg-[#E6F7FC] border-2 border-[#99E2F5] rounded-2xl text-[#0066D6] flex items-center justify-center active:scale-95 transition-transform cursor-pointer">
+                        <svg class="w-6 h-6 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round">
+                            <line x1="4" y1="7" x2="20" y2="7" />
+                            <line x1="4" y1="12" x2="20" y2="12" />
+                            <line x1="4" y1="17" x2="20" y2="17" />
+                        </svg>
+                    </button>
                 </div>
-            @endif
-            <div class="profile-name">{{ Auth::user()->first_name }} {{ Auth::user()->last_name }}</div>
-            <div class="profile-role">{{ ucfirst(Auth::user()->role ?? 'User') }}</div>
+            @endauth
         </div>
+    </header>
 
-        <nav class="sb-nav">
-            <a href="{{ route('dashboard') }}" class="sb-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                Dashboard
-            </a>
-            <a href="{{ route('subjects.index') }}" class="sb-item {{ request()->routeIs('subjects.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                Subjects
-            </a>
-            <a href="{{ route('quiz.create') }}" class="sb-item {{ request()->routeIs('quiz.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                Quizzes
-            </a>
-            <a href="{{ route('profile.edit') }}" class="sb-item {{ request()->routeIs('profile.*') || request()->routeIs('settings') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
-            </a>
-        </nav>
+    <div class="flex flex-1 min-h-screen relative">
+        <!-- Mobile/Tablet Drawer Backdrop Overlay -->
+        <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-[#0D2B4E]/40 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity"></div>
 
-        <div class="sb-bottom">
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="logout-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Log out
-                </button>
-            </form>
-        </div>
-    </aside>
-    @endauth
+        <!-- Adaptive Navigation Sidebar -->
+        @auth
+        <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-white border-r-[3px] border-[#B8E2F8] shadow-[6px_0_24px_rgba(0,102,214,0.06)] flex flex-col z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out shrink-0 overflow-y-auto">
+            <div class="bb-spectrum-bar"></div>
 
-    <main class="main-content">
-        @yield('content')
-    </main>
-</div>
+            <div class="p-5 flex flex-col flex-1">
+                <!-- Brand Logo -->
+                <div class="pt-1 pb-4 flex items-center justify-center">
+                    <x-brand-logo :href="route('dashboard')" :size="40" :text-size="20" />
+                </div>
 
-{{-- FLOATING NOTIFICATIONS --}}
-@if(session('success') || session('error'))
-    <div id="floating-toast-container">
+                <!-- User Profile Card -->
+                <div class="flex flex-col items-center text-center pb-5">
+                    <div class="relative mb-2.5">
+                        @if(Auth::user()->avatar_url)
+                            <img src="{{ Auth::user()->avatar_url }}"
+                                 class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 {{ $isStudent ? 'border-[#38BDF8]' : 'border-[#68CC18]' }} object-cover shadow-md"
+                                 alt="Profile Picture">
+                        @else
+                            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white border-4 {{ $isStudent ? 'border-[#BAE6FD]' : 'border-[#D9F99D]' }} flex items-center justify-center text-xl sm:text-2xl font-black shadow-md"
+                                 style="background: {{ $isStudent ? 'linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%)' : 'linear-gradient(135deg, #55B310 0%, #68CC18 100%)' }};">
+                                {{ strtoupper(substr(Auth::user()->first_name ?? Auth::user()->name, 0, 1)) }}{{ strtoupper(substr(Auth::user()->last_name ?? '', 0, 1)) }}
+                            </div>
+                        @endif
+
+                        @if($isStudent)
+                            <span class="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-[#FF8400] border-2 border-white text-white font-black text-[11px] shadow-xs">
+                                Lv.{{ $userLevel }}
+                            </span>
+                        @endif
+                    </div>
+
+                    <h2 class="font-black text-sm sm:text-base text-[#0D2B4E] leading-tight w-full truncate">
+                        {{ Auth::user()->first_name }} {{ Auth::user()->last_name }}
+                    </h2>
+
+                    @if($isStudent)
+                        <div class="w-full mt-3 bg-[#F2FAFF] border-2 border-[#B8E2F8] rounded-2xl p-2.5 shadow-[0_3px_0_#D4F1FC]">
+                            <div class="flex justify-between items-center text-[11px] font-black mb-1">
+                                <span class="text-[#0066D6]">⚡ {{ number_format($userXp) }} XP</span>
+                                <span class="text-[#D96B00]">Level {{ $userLevel }}</span>
+                            </div>
+                            <div class="w-full h-2.5 bg-[#E0F2FE] rounded-full overflow-hidden border border-[#BAE6FD]">
+                                <div class="h-full bb-xp-fill rounded-full transition-all duration-500" style="width: {{ $xpPercent }}%;"></div>
+                            </div>
+                        </div>
+                    @else
+                        <span class="mt-1.5 px-3.5 py-0.5 bg-[#ECFCCB] text-[#3E8708] text-[11px] font-black uppercase tracking-wider rounded-full border-2 border-[#A3E635]">
+                            {{ ucfirst(Auth::user()->role ?? 'Teacher') }}
+                        </span>
+                    @endif
+                </div>
+
+                <!-- Navigation Links -->
+                <nav class="flex flex-col gap-2 flex-1">
+                    @if(Auth::user()->role === 'admin')
+                        <a href="{{ route('admin.dashboard') }}" class="bb-sidebar-link {{ request()->routeIs('admin.dashboard') ? 'bb-nav-active-blue' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            Students
+                        </a>
+                        <a href="{{ route('admin.subjects.index') }}" class="bb-sidebar-link {{ request()->routeIs('admin.subjects.*') ? 'bb-nav-active-lime' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            Subjects
+                        </a>
+                        <a href="{{ route('admin.quizzes.index') }}" class="bb-sidebar-link {{ request()->routeIs('admin.quizzes.*') ? 'bb-nav-active-orange' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            Quizzes
+                        </a>
+                    @elseif($isStudent)
+                        <a href="{{ route('dashboard') }}" class="bb-sidebar-link {{ request()->routeIs('dashboard') ? 'bb-nav-active-blue' : '' }}">
+                            <span class="text-lg">🚀</span>
+                            Adventure Hub
+                        </a>
+                        <a href="{{ route('subjects.index') }}" class="bb-sidebar-link {{ request()->routeIs('subjects.*') ? 'bb-nav-active-lime' : '' }}">
+                            <span class="text-lg">📚</span>
+                            My Subjects
+                        </a>
+                        <a href="{{ route('assignments.index') }}" class="bb-sidebar-link {{ request()->routeIs('assignments.*') ? 'bb-nav-active-purple' : '' }}">
+                            <span class="text-lg">📝</span>
+                            <span class="flex-1">Assignments</span>
+                            @if($pendingAssignmentsCount > 0)
+                                <span class="px-2 py-0.5 rounded-full bg-[#FF8400] text-white text-[11px] font-black shadow-2xs">
+                                    {{ $pendingAssignmentsCount }}
+                                </span>
+                            @endif
+                        </a>
+                        <a href="{{ route('quiz.index') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.index') || request()->routeIs('quiz.show') ? 'bb-nav-active-orange' : '' }}">
+                            <span class="text-lg">⚔️</span>
+                            Quiz Quests
+                        </a>
+                        @if(\Illuminate\Support\Facades\Route::has('quiz.history'))
+                            <a href="{{ route('quiz.history') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.history') || request()->routeIs('quiz.review') ? 'bb-nav-active-cyan' : '' }}">
+                                <span class="text-lg">📜</span>
+                                Quiz History
+                            </a>
+                        @endif
+                    @else
+                        <a href="{{ route('dashboard') }}" class="bb-sidebar-link {{ request()->routeIs('dashboard') ? 'bb-nav-active-blue' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+                            Dashboard
+                        </a>
+                        <a href="{{ route('subjects.index') }}" class="bb-sidebar-link {{ request()->routeIs('subjects.*') ? 'bb-nav-active-lime' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            Subjects
+                        </a>
+                        <a href="{{ route('quiz.index') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.*') ? 'bb-nav-active-orange' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            Quizzes
+                        </a>
+                    @endif
+
+                    <a href="{{ route('profile.edit') }}" class="bb-sidebar-link {{ request()->routeIs('profile.*') || request()->routeIs('settings') ? 'bb-nav-active-cyan' : '' }}">
+                        @if($isStudent)
+                            <span class="text-lg">⚙️</span>
+                        @else
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        @endif
+                        Settings
+                    </a>
+                </nav>
+
+                <!-- Bottom Logout Action -->
+                <div class="pt-4 mt-4">
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="w-full px-4 py-3 rounded-2xl border-[3px] border-[#B8E2F8] bg-[#F2FAFF] text-[#0066D6] font-black text-sm flex items-center justify-center gap-2 shadow-[0_4px_0_#D4F1FC] hover:bg-[#FFF7ED] hover:border-[#FF8400] hover:text-[#D96B00] hover:shadow-[0_4px_0_#FED7AA] active:translate-y-0.5 transition-all cursor-pointer">
+                            <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log out
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+        @endauth
+
+        <!-- Fluid Full Width Workspace Container -->
+        <main class="flex-1 {{ Auth::check() ? 'lg:ml-64' : '' }} p-4 sm:p-6 lg:p-8 w-full">
+            @yield('content')
+        </main>
+    </div>
+
+    <!-- Global Auto-Fading Toast Notifications (3 Seconds) -->
+    @php
+        $unreadBadgeAlerts = collect();
+        if (Auth::check() && Auth::user()->isStudent() && \Illuminate\Support\Facades\Schema::hasTable('badge_notifications')) {
+            $unreadBadgeAlerts = \App\Models\BadgeNotification::with('badge')
+                ->where('student_id', Auth::id())
+                ->where('is_read', false)
+                ->orderBy('id')
+                ->get();
+
+            if ($unreadBadgeAlerts->isNotEmpty()) {
+                \App\Models\BadgeNotification::whereIn('id', $unreadBadgeAlerts->pluck('id'))
+                    ->update(['is_read' => true]);
+            }
+        }
+    @endphp
+
+    <div id="global-toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2.5 max-w-sm sm:max-w-md w-[calc(100%-2rem)] pointer-events-none">
         @if(session('success'))
-            <div class="toast toast-success">
-                <span style="font-size: 18px;">✅</span> {{ session('success') }}
+            <div class="auto-fade-toast pointer-events-auto bg-[#68CC18] text-white font-black p-3.5 sm:p-4 rounded-2xl shadow-xl flex items-center gap-3 border-4 border-[#BEF264] text-xs sm:text-sm transition-all duration-500 ease-out">
+                <span class="text-xl sm:text-2xl">✅</span> <span>{{ session('success') }}</span>
             </div>
         @endif
 
         @if(session('error'))
-            <div class="toast toast-error">
-                <span style="font-size: 18px;">🚨</span> {{ session('error') }}
+            <div class="auto-fade-toast pointer-events-auto bg-[#FF8400] text-white font-black p-3.5 sm:p-4 rounded-2xl shadow-xl flex items-center gap-3 border-4 border-[#FDBA74] text-xs sm:text-sm transition-all duration-500 ease-out">
+                <span class="text-xl sm:text-2xl">⚠️</span> <span>{{ session('error') }}</span>
             </div>
         @endif
+
+        @foreach($unreadBadgeAlerts as $alert)
+            @php
+                $isEarned = $alert->type === 'earned';
+            @endphp
+            <div class="auto-fade-toast pointer-events-auto {{ $isEarned ? 'bg-amber-400 text-amber-950 border-amber-200' : 'bg-rose-500 text-white border-rose-300' }} font-black p-3.5 sm:p-4 rounded-2xl shadow-xl flex items-center gap-3 border-4 text-xs sm:text-sm transition-all duration-500 ease-out">
+                @if($alert->badge)
+                    <img src="{{ $alert->badge->image_url }}" alt="{{ $alert->badge->name }}" class="w-10 h-10 object-contain shrink-0 bg-white/80 rounded-xl p-1">
+                @else
+                    <span class="text-2xl shrink-0">{{ $isEarned ? '🏅' : '💔' }}</span>
+                @endif
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider opacity-80">
+                        {{ $isEarned ? '🎉 New Badge Unlocked!' : '⚠️ Badge Taken Away' }}
+                    </p>
+                    <p class="leading-snug">{{ $alert->message }}</p>
+                </div>
+            </div>
+        @endforeach
     </div>
 
-    <style>
-        #floating-toast-container {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 99999;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            pointer-events: none;
-        }
-        
-        .toast {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 16px 24px;
-            border-radius: 14px;
-            font-family: 'Nunito', sans-serif;
-            font-size: 14px;
-            font-weight: 800;
-            color: #fff;
-            animation: toastSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            transition: opacity 0.4s ease, transform 0.4s ease;
-        }
-        
-        .toast-success {
-            background: #10B981;
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-        }
-        
-        .toast-error {
-            background: #EF4444;
-            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
-        }
-        
-        .toast.hiding {
-            opacity: 0;
-            transform: translateX(100%);
-        }
-        
-        @keyframes toastSlideIn {
-            0% { transform: translateX(120%); opacity: 0; }
-            100% { transform: translateX(0); opacity: 1; }
-        }
-    </style>
-
     <script>
+        function scheduleToastFade(toastEl, delayMs = 3000) {
+            setTimeout(() => {
+                toastEl.style.opacity = '0';
+                toastEl.style.transform = 'translateY(-8px)';
+                setTimeout(() => toastEl.remove(), 500);
+            }, delayMs);
+        }
+
+        window.showBrainBalanceToast = function (alertObj, delayMs = 3000) {
+            const container = document.getElementById('global-toast-container');
+            if (!container) return;
+
+            const isEarned = (alertObj.type || 'earned') === 'earned';
+            const toast = document.createElement('div');
+            toast.className = `auto-fade-toast pointer-events-auto ${
+                isEarned
+                    ? 'bg-amber-400 text-amber-950 border-amber-200'
+                    : 'bg-rose-500 text-white border-rose-300'
+            } font-black p-3.5 sm:p-4 rounded-2xl shadow-xl flex items-center gap-3 border-4 text-xs sm:text-sm transition-all duration-500 ease-out`;
+
+            const imgHtml = alertObj.image
+                ? `<img src="${alertObj.image}" alt="${alertObj.name || 'Badge'}" class="w-10 h-10 object-contain shrink-0 bg-white/80 rounded-xl p-1">`
+                : `<span class="text-2xl shrink-0">${isEarned ? '🏅' : '💔'}</span>`;
+
+            toast.innerHTML = `
+                ${imgHtml}
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider opacity-80">
+                        ${isEarned ? '🎉 New Badge Unlocked!' : '⚠️ Badge Taken Away'}
+                    </p>
+                    <p class="leading-snug">${alertObj.message || ('You earned ' + alertObj.name)}</p>
+                </div>
+            `;
+
+            container.appendChild(toast);
+            scheduleToastFade(toast, delayMs);
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
-            const toasts = document.querySelectorAll('.toast');
-            toasts.forEach(toast => {
-                setTimeout(() => {
-                    toast.classList.add('hiding');
-                    setTimeout(() => toast.remove(), 400); 
-                }, 3000);
+            document.querySelectorAll('.auto-fade-toast').forEach((toast, idx) => {
+                scheduleToastFade(toast, 3000 + (idx * 250));
             });
         });
-    </script>
-@endif
 
-<!-- AUDIO FEEDBACK POP SOUND SCRIPT WITH EVENT DELEGATION -->
-<script>
-    function playPopSound() {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.08);
-            
-            gain.gain.setValueAtTime(0.15, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
-            
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            
-            osc.start();
-            osc.stop(ctx.currentTime + 0.08);
-        } catch (e) {}
-    }
-
-    // Event Delegation: Automatically captures clicks on buttons, item cards, and classroom cards
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-primary, .btn-teal, .btn-ghost, .card, .item-card, .class-card, .sb-item')) {
-            playPopSound();
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sb && overlay) {
+                sb.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
         }
-    });
-
-    function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('show');
-        document.getElementById('sidebarOverlay').classList.toggle('show');
-    }
-</script>
-@stack('scripts')
+    </script>
+    @stack('scripts')
 </body>
 </html>

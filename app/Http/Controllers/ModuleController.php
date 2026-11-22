@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Module;
 use App\Models\Classroom;
-use App\Services\GeminiService;
+use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -12,12 +12,12 @@ use Illuminate\Support\Facades\Storage;
 
 class ModuleController extends Controller
 {
-    protected ?GeminiService $ai = null;
+    protected ?GroqService $ai = null;
 
     public function __construct()
     {
         try {
-            $this->ai = app(GeminiService::class);
+            $this->ai = app(GroqService::class);
         } catch (\Throwable $e) {
             $this->ai = null;
         }
@@ -27,25 +27,33 @@ class ModuleController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->isTeacher()) {
+        if ($user->role === 'admin') {
+            $modules = Module::latest()->get();
+        } elseif ($user->isTeacher()) {
             $classIds = $user->ownedClasses->pluck('id');
+            $modules = Module::whereIn('class_id', $classIds)->latest()->get();
         } else {
             $classIds = $user->joinedClasses->pluck('id');
+            $modules = Module::whereIn('class_id', $classIds)->latest()->get();
         }
 
-        $modules = Module::whereIn('class_id', $classIds)->latest()->get();
         return view('modules.index', compact('modules'));
     }
 
     public function store(Request $request)
     {
-        abort_unless(Auth::user()->isTeacher(), 403);
+        $user = Auth::user();
+        abort_unless($user->isTeacher() || $user->role === 'admin', 403);
 
         $request->validate([
             'class_id' => 'required|exists:classes,id',
             'title'    => 'required|string|max:255',
-            'file'     => 'required|file|mimes:pdf,doc,docx,ppt,pptx,jpg,jpeg,png|max:10240',
+            'file'     => 'required|file|max:102400',
         ]);
+
+        if ($user->role !== 'admin') {
+            abort_unless($user->ownedClasses->contains($request->class_id), 403);
+        }
 
         $file = $request->file('file');
         $filePath = $file->store('modules', 'public');
@@ -55,18 +63,30 @@ class ModuleController extends Controller
             'title'     => $request->title,
             'file_name' => $file->getClientOriginalName(),
             'file_path' => $filePath,
-            'file_type' => $file->getClientOriginalExtension(),
+            'file_type' => strtolower($file->getClientOriginalExtension() ?: 'file'),
+            'file_size' => $file->getSize(),
         ]);
 
         return back()->with('success', 'Module uploaded successfully!');
     }
 
     /**
-     * Serve the file directly to the browser for inline viewing (PDFs/Images/Docs).
+     * Split-screen reader: document on the left, AI study assistant on the right.
      */
-    public function view(Module $module)
+    public function read(Module $module)
+    {
+        $this->authorizeModuleAccess($module);
+
+        return view('modules.read', compact('module'));
+    }
+
+    protected function authorizeModuleAccess(Module $module): void
     {
         $user = Auth::user();
+
+        if ($user->role === 'admin') {
+            return;
+        }
 
         if ($user->isStudent() && !$user->joinedClasses->contains($module->class_id)) {
             abort(403, 'You are not enrolled in this class.');
@@ -75,6 +95,14 @@ class ModuleController extends Controller
         if ($user->isTeacher() && !$user->ownedClasses->contains($module->class_id)) {
             abort(403, 'Unauthorized access to this module.');
         }
+    }
+
+    /**
+     * Serve the file directly to the browser for inline viewing.
+     */
+    public function view(Module $module)
+    {
+        $this->authorizeModuleAccess($module);
 
         $fullPath = Storage::disk('public')->path($module->file_path);
 
@@ -82,7 +110,7 @@ class ModuleController extends Controller
             abort(404, 'Module file not found on server.');
         }
 
-        $mimeType = Storage::disk('public')->mimeType($module->file_path) ?? 'application/pdf';
+        $mimeType = Storage::disk('public')->mimeType($module->file_path) ?? 'application/octet-stream';
 
         return response()->file($fullPath, [
             'Content-Type'        => $mimeType,
@@ -92,23 +120,19 @@ class ModuleController extends Controller
 
     public function download(Module $module)
     {
-        $user = Auth::user();
-
-        if ($user->isStudent() && !$user->joinedClasses->contains($module->class_id)) {
-            abort(403);
-        }
-
-        if ($user->isTeacher() && !$user->ownedClasses->contains($module->class_id)) {
-            abort(403);
-        }
+        $this->authorizeModuleAccess($module);
 
         return Storage::disk('public')->download($module->file_path, $module->file_name);
     }
 
     public function destroy(Module $module)
     {
-        abort_unless(Auth::user()->isTeacher(), 403);
-        abort_unless(Auth::user()->ownedClasses->contains($module->class_id), 403);
+        $user = Auth::user();
+        abort_unless($user->isTeacher() || $user->role === 'admin', 403);
+
+        if ($user->role !== 'admin') {
+            abort_unless($user->ownedClasses->contains($module->class_id), 403);
+        }
 
         Storage::disk('public')->delete($module->file_path);
         $module->delete();
@@ -117,7 +141,7 @@ class ModuleController extends Controller
     }
 
     /**
-     * AI Study Assistant Handler for Module Guidance.
+     * Groq AI Study Assistant Handler with PDF Document Context.
      */
     public function aiChat(Request $request, Module $module)
     {
@@ -128,9 +152,13 @@ class ModuleController extends Controller
                 return response()->json(['error' => 'Unauthenticated.'], 401);
             }
 
-            if ($user->isStudent() && method_exists($user, 'joinedClasses') && $user->joinedClasses) {
-                if (!$user->joinedClasses->contains($module->class_id)) {
+            if ($user->role !== 'admin') {
+                if ($user->isStudent() && !$user->joinedClasses->contains($module->class_id)) {
                     return response()->json(['error' => 'You are not enrolled in this class.'], 403);
+                }
+
+                if ($user->isTeacher() && !$user->ownedClasses->contains($module->class_id)) {
+                    return response()->json(['error' => 'Unauthorized access to this module.'], 403);
                 }
             }
 
@@ -140,19 +168,34 @@ class ModuleController extends Controller
             }
 
             if (!$this->ai) {
-                $this->ai = app(GeminiService::class);
+                $this->ai = app(GroqService::class);
             }
 
-            $prompt = "You are BrainBalance AI, a friendly elementary school tutor. " .
-                      "The student is asking a question about the study module titled '{$module->title}'. " .
-                      "Student Question: \"{$userPrompt}\". " .
-                      "Provide a simple, clear, encouraging answer suitable for young learners.";
+            $fullPath = Storage::disk('public')->path($module->file_path);
 
-            $reply = $this->ai->askQuestion($prompt);
+            // Recent chat turns so follow-up questions ("explain that again") work.
+            $history = collect($request->input('history', []))
+                ->filter(fn ($m) => is_array($m)
+                    && in_array($m['role'] ?? null, ['user', 'assistant'], true)
+                    && is_string($m['content'] ?? null))
+                ->map(fn ($m) => [
+                    'role'    => $m['role'],
+                    'content' => mb_substr($m['content'], 0, 1500),
+                ])
+                ->take(-6)
+                ->values()
+                ->all();
+
+            $reply = $this->ai->askQuestionAboutPdf(
+                $fullPath,
+                $module->title,
+                $userPrompt,
+                $history
+            );
 
             return response()->json(['reply' => $reply]);
         } catch (\Throwable $e) {
-            Log::error("Gemini AI Chat Error: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Groq AI Chat Error: " . $e->getMessage(), ['exception' => $e]);
 
             return response()->json([
                 'reply' => "⚠️ AI Error: " . $e->getMessage()

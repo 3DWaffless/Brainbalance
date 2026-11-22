@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Badge extends Model
 {
+    protected $table = 'badges';
+
     protected $fillable = [
         'name',
         'description',
@@ -14,9 +16,16 @@ class Badge extends Model
         'criteria_value',
     ];
 
-    public function students()
+    public function getImageUrlAttribute(): string
     {
-        return $this->belongsToMany(User::class, 'student_badges', 'badge_id', 'student_id')
-                    ->withPivot('earned_at');
+        $baseName = pathinfo($this->icon ?? '1stplace', PATHINFO_FILENAME);
+
+        foreach (['png', 'webp', 'jpg', 'jpeg', 'svg', 'PNG', 'JPG'] as $ext) {
+            if (file_exists(public_path("images/{$baseName}.{$ext}"))) {
+                return asset("images/{$baseName}.{$ext}");
+            }
+        }
+
+        return asset("images/{$baseName}.png");
     }
 }

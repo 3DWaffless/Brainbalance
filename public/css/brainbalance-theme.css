@@ -1,0 +1,220 @@
+/* ==========================================================================
+   BrainBalance Centralized Theme (Matched to BrainBalanceLogo_2.jpg)
+   - Left Hemisphere: Cyan (#28C4F3) -> Royal Blue (#1D7BF2)
+   - Right Hemisphere: Lime Green (#7ED918) -> Amber-Orange (#FF9D00)
+   ========================================================================== */
+
+:root {
+    --bb-blue: #1D7BF2;
+    --bb-blue-dark: #155EC2;
+    --bb-blue-soft: #EBF5FF;
+    --bb-cyan: #28C4F3;
+    --bb-cyan-dark: #0EA5E9;
+
+    --bb-green: #65C91A;
+    --bb-green-dark: #4EA30E;
+    --bb-green-soft: #ECFCCB;
+    --bb-lime: #8CE022;
+
+    --bb-orange: #FF9D00;
+    --bb-orange-dark: #D97E00;
+    --bb-orange-soft: #FFF7ED;
+    --bb-gold: #FFC800;
+
+    --bb-bg: #F3F9FF;
+    --bb-surface: #FFFFFF;
+    --bb-border: #C7E0FF;
+    --bb-border-strong: #93C5FD;
+    --bb-text: #0F2D52;
+    --bb-text-muted: #526D8E;
+    --bb-danger: #EF4444;
+    --bb-danger-dark: #DC2626;
+
+    --color-brand-bg: var(--bb-bg);
+    --color-brand-surface: var(--bb-surface);
+    --color-brand-border: var(--bb-border);
+    --color-brand-text: var(--bb-text);
+    --color-brand-coral: var(--bb-blue);
+    --color-brand-teal: var(--bb-green);
+    --color-brand-amber: var(--bb-orange);
+    --color-brand-purple: var(--bb-cyan);
+}
+
+.font-display {
+    font-family: 'Fredoka', 'Nunito', sans-serif !important;
+}
+
+.bg-brand-bg { background-color: var(--bb-bg) !important; }
+.bg-brand-border { background-color: var(--bb-blue-soft) !important; }
+.bg-brand-coral { background-color: var(--bb-blue) !important; }
+.bg-brand-teal { background-color: var(--bb-green) !important; }
+
+.text-brand-text { color: var(--bb-text) !important; }
+.text-brand-coral { color: var(--bb-blue) !important; }
+.text-brand-teal { color: var(--bb-green-dark) !important; }
+.text-brand-amber { color: var(--bb-orange-dark) !important; }
+.text-brand-purple { color: var(--bb-cyan-dark) !important; }
+
+.border-brand-border { border-color: var(--bb-border) !important; }
+.border-brand-coral { border-color: var(--bb-blue) !important; }
+.border-brand-teal { border-color: var(--bb-green) !important; }
+
+.shadow-tactile-ghost {
+    box-shadow: 0 6px 0 var(--bb-border) !important;
+}
+
+body.theme-student,
+body.theme-teacher {
+    background-color: var(--bb-bg) !important;
+    background-image: radial-gradient(var(--bb-border) 2.2px, transparent 2.2px);
+    background-size: 32px 32px;
+    color: var(--bb-text);
+}
+
+.card-tactile,
+.card {
+    background: var(--bb-surface) !important;
+    border: 3px solid var(--bb-border) !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 6px 0 var(--bb-border) !important;
+    padding: 1.35rem;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+}
+
+.card-tactile:hover {
+    transform: translateY(-2px);
+}
+
+.card-tactile-interactive {
+    background: var(--bb-bg) !important;
+    border: 3px solid var(--bb-border) !important;
+    border-radius: 1.25rem !important;
+    box-shadow: 0 4px 0 var(--bb-border) !important;
+    padding: 1rem 1.15rem;
+    transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.card-tactile-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--bb-border-strong) !important;
+}
+
+.btn-tactile-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(180deg, var(--bb-cyan) 0%, var(--bb-blue) 100%) !important;
+    color: #FFFFFF !important;
+    font-weight: 900 !important;
+    border: none !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 5px 0 var(--bb-blue-dark) !important;
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.1s ease !important;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-tactile-primary:hover { filter: brightness(1.04); }
+.btn-tactile-primary:active {
+    transform: translateY(4px) !important;
+    box-shadow: 0 1px 0 var(--bb-blue-dark) !important;
+}
+
+.btn-tactile-teal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(180deg, var(--bb-lime) 0%, var(--bb-green) 100%) !important;
+    color: #FFFFFF !important;
+    font-weight: 900 !important;
+    border: none !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 5px 0 var(--bb-green-dark) !important;
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.1s ease !important;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-tactile-teal:hover { filter: brightness(1.04); }
+.btn-tactile-teal:active {
+    transform: translateY(4px) !important;
+    box-shadow: 0 1px 0 var(--bb-green-dark) !important;
+}
+
+.btn-tactile-orange {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(180deg, var(--bb-gold) 0%, var(--bb-orange) 100%) !important;
+    color: var(--bb-text) !important;
+    font-weight: 900 !important;
+    border: none !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 5px 0 var(--bb-orange-dark) !important;
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.1s ease !important;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-tactile-orange:active {
+    transform: translateY(4px) !important;
+    box-shadow: 0 1px 0 var(--bb-orange-dark) !important;
+}
+
+.btn-tactile-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    background: var(--bb-surface) !important;
+    color: var(--bb-blue) !important;
+    font-weight: 900 !important;
+    border: 2.5px solid var(--bb-border) !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 4px 0 var(--bb-border) !important;
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.1s ease !important;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-tactile-ghost:hover {
+    background: var(--bb-blue-soft) !important;
+    border-color: var(--bb-border-strong) !important;
+}
+.btn-tactile-ghost:active {
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 var(--bb-border) !important;
+}
+
+.btn-tactile-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    background: var(--bb-danger) !important;
+    color: #FFFFFF !important;
+    font-weight: 900 !important;
+    border: none !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 4px 0 var(--bb-danger-dark) !important;
+    transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-tactile-danger:active {
+    transform: translateY(3px) !important;
+    box-shadow: 0 1px 0 var(--bb-danger-dark) !important;
+}
+
+@keyframes bbFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+}
+
+@keyframes bbPopIn {
+    0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+    70% { transform: scale(1.03) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.bb-float { animation: bbFloat 2.6s ease-in-out infinite; }
+.bb-pop-in { animation: bbPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }

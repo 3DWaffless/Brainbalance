@@ -1,9 +1,188 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+@layer base {
+  /* ===================================================
+     TEACHER / ADMIN VIEW (Spectrum Lime + Royal Blue)
+  =================================================== */
+  :root, .theme-teacher {
+    --bb-blue: #0066D6;
+    --bb-blue-dark: #004FA8;
+    --bb-cyan: #1DC4DF;
+    --bb-cyan-dark: #0E9EB8;
+    --bb-lime: #68CC18;
+    --bb-lime-dark: #4FA30D;
+    --bb-orange: #FF8400;
+    --bb-orange-dark: #D96B00;
+    --bb-spectrum: linear-gradient(90deg, #0066D6 0%, #1DC4DF 33%, #68CC18 68%, #FF8400 100%);
+
+    --theme-bg: #F5FAFF;
+    --theme-field-bg: #F2FAFF;
+    --theme-card: #FFFFFF;
+    --theme-border: #B8E2F8;
+    --theme-primary: #0066D6;
+    --theme-primary-hover: #004FA8;
+    --theme-secondary: #68CC18;
+    --theme-secondary-hover: #4FA30D;
+    --theme-amber: #FF8400;
+    --theme-text: #0D2B4E;
+
+    --theme-shadow-primary: #004FA8;
+    --theme-shadow-secondary: #3E8708;
+    --theme-shadow-card: #D4F1FC;
+  }
+
+  /* ===================================================
+     STUDENT VIEW (Spectrum Royal Blue + Cyan + Orange)
+  =================================================== */
+  .theme-student {
+    --theme-bg: #F5FAFF;
+    --theme-field-bg: #F2FAFF;
+    --theme-card: #FFFFFF;
+    --theme-border: #B8E2F8;
+    --theme-primary: #0066D6;
+    --theme-primary-hover: #004FA8;
+    --theme-secondary: #68CC18;
+    --theme-secondary-hover: #4FA30D;
+    --theme-amber: #FF8400;
+    --theme-text: #0D2B4E;
+
+    --theme-shadow-primary: #004FA8;
+    --theme-shadow-secondary: #3E8708;
+    --theme-shadow-card: #D4F1FC;
+
+    background-color: #F5FAFF;
+    background-image:
+      radial-gradient(at 6% 8%, rgba(0, 102, 214, 0.14) 0px, transparent 42%),
+      radial-gradient(at 45% 4%, rgba(29, 196, 223, 0.16) 0px, transparent 42%),
+      radial-gradient(at 92% 14%, rgba(104, 204, 24, 0.15) 0px, transparent 44%),
+      radial-gradient(at 86% 86%, rgba(255, 132, 0, 0.14) 0px, transparent 46%),
+      radial-gradient(#CBE6FF 2px, transparent 2px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 34px 34px;
+    font-size: 103%;
+  }
+}
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans: 'Nunito', system-ui, sans-serif;
+  --font-display: 'Fredoka', 'Nunito', sans-serif;
+
+  --color-brand-bg: var(--theme-field-bg);
+  --color-brand-card: var(--theme-card);
+  --color-brand-border: var(--theme-border);
+  --color-brand-coral: var(--theme-primary);
+  --color-brand-coral-hover: var(--theme-primary-hover);
+  --color-brand-teal: var(--theme-secondary);
+  --color-brand-teal-hover: var(--theme-secondary-hover);
+  --color-brand-amber: var(--theme-amber);
+  --color-brand-purple: #0066D6;
+  --color-brand-text: var(--theme-text);
+
+  --shadow-tactile-coral: 0 5px 0 var(--theme-shadow-primary);
+  --shadow-tactile-coral-hover: 0 7px 0 var(--theme-shadow-primary);
+  --shadow-tactile-coral-active: 0 2px 0 var(--theme-shadow-primary);
+  --shadow-tactile-teal: 0 5px 0 var(--theme-shadow-secondary);
+  --shadow-tactile-teal-hover: 0 7px 0 var(--theme-shadow-secondary);
+  --shadow-tactile-teal-active: 0 2px 0 var(--theme-shadow-secondary);
+  --shadow-tactile-ghost: 0 4px 0 var(--theme-shadow-card);
+  --shadow-tactile-card: 0 8px 0 var(--theme-shadow-card);
+}
+
+@layer components {
+  .bb-spectrum-bar {
+    height: 6px;
+    width: 100%;
+    background: linear-gradient(90deg, #0066D6 0%, #1DC4DF 33%, #68CC18 68%, #FF8400 100%);
+    flex-shrink: 0;
+  }
+
+  /* Tactile Spectrum Buttons */
+  .btn-tactile-primary,
+  .btn-primary {
+    background: linear-gradient(135deg, #0066D6 0%, #1DC4DF 100%);
+    border: 2px solid #004FA8;
+    box-shadow: 0 5px 0 #004FA8;
+    @apply text-white font-black rounded-2xl min-h-[44px] px-5 py-2.5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:brightness-105 active:translate-y-1 inline-flex items-center justify-center gap-2 cursor-pointer select-none text-xs sm:text-sm no-underline;
+  }
+
+  .theme-teacher .btn-tactile-primary {
+    background: linear-gradient(135deg, #55B310 0%, #68CC18 100%);
+    border-color: #3E8708;
+    box-shadow: 0 5px 0 #3E8708;
+  }
+
+  .btn-tactile-teal,
+  .btn-teal {
+    background: linear-gradient(135deg, #55B310 0%, #68CC18 100%);
+    border: 2px solid #3E8708;
+    box-shadow: 0 5px 0 #3E8708;
+    @apply text-white font-black rounded-2xl min-h-[44px] px-5 py-2.5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:brightness-105 active:translate-y-1 inline-flex items-center justify-center gap-2 cursor-pointer select-none text-xs sm:text-sm no-underline;
+  }
+
+  .btn-tactile-orange {
+    background: linear-gradient(135deg, #FF8400 0%, #FFA31A 100%);
+    border: 2px solid #D96B00;
+    box-shadow: 0 5px 0 #D96B00;
+    @apply text-white font-black rounded-2xl min-h-[44px] px-5 py-2.5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:brightness-105 active:translate-y-1 inline-flex items-center justify-center gap-2 cursor-pointer select-none text-xs sm:text-sm no-underline;
+  }
+
+  .btn-tactile-ghost,
+  .btn-ghost {
+    background: #F2FAFF;
+    border: 2.5px solid #B8E2F8;
+    box-shadow: 0 4px 0 #D4F1FC;
+    @apply text-[#0066D6] font-black rounded-2xl min-h-[42px] px-4 py-2 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#E6F7FC] active:translate-y-0.5 inline-flex items-center justify-center gap-2 cursor-pointer select-none text-xs sm:text-sm no-underline;
+  }
+
+  /* Responsive Spectrum Cards */
+  .card-tactile,
+  .card {
+    background: #FFFFFF;
+    border: 3.5px solid #B8E2F8;
+    box-shadow: 0 8px 0 #D4F1FC;
+    @apply rounded-2xl sm:rounded-3xl p-5 sm:p-6 transition-all duration-150;
+  }
+
+  .card-tactile-interactive {
+    background: #F2FAFF;
+    border: 3px solid #B8E2F8;
+    box-shadow: 0 4px 0 #D4F1FC;
+    @apply rounded-2xl p-4 transition-all duration-150 ease-out hover:-translate-y-1 hover:border-[#1DC4DF] hover:bg-white active:translate-y-0.5;
+  }
+
+  /* Student View Bubblier Overrides */
+  .theme-student .card-tactile {
+    @apply rounded-[28px] sm:rounded-[32px] border-[4px];
+  }
+
+  .theme-student .card-tactile-interactive {
+    @apply rounded-[22px] border-[3px];
+  }
+
+  .theme-student .btn-tactile-primary,
+  .theme-student .btn-tactile-teal,
+  .theme-student .btn-tactile-orange {
+    @apply rounded-[20px];
+  }
+
+  /* Legacy View Layout Bridges (topbar, tgreet, tsub) */
+  .topbar {
+    background: #FFFFFF;
+    border: 3.5px solid #B8E2F8;
+    box-shadow: 0 8px 0 #D4F1FC;
+    @apply rounded-3xl p-5 sm:p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden;
+  }
+  .topbar::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #0066D6 0%, #1DC4DF 33%, #68CC18 68%, #FF8400 100%);
+  }
+  .tgreet {
+    font-family: 'Fredoka', 'Nunito', sans-serif;
+    @apply text-2xl sm:text-3xl font-bold text-[#0D2B4E] leading-tight;
+  }
+  .tsub {
+    @apply text-xs sm:text-sm font-bold text-[#5A7696] mt-1;
+  }
 }

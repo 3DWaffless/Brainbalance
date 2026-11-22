@@ -11,14 +11,20 @@ class StudentBadge extends Model
     protected $fillable = [
         'student_id',
         'badge_id',
+        'class_id',
+        'quiz_id',
         'earned_at',
+        'is_read',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'earned_at' => 'datetime',
+        'is_read'   => 'boolean',
+    ];
+
+    public function badge()
     {
-        return [
-            'earned_at' => 'datetime',
-        ];
+        return $this->belongsTo(Badge::class, 'badge_id');
     }
 
     public function student()
@@ -26,8 +32,13 @@ class StudentBadge extends Model
         return $this->belongsTo(User::class, 'student_id');
     }
 
-    public function badge()
+    public function classroom()
     {
-        return $this->belongsTo(Badge::class);
+        return $this->belongsTo(Classroom::class, 'class_id');
+    }
+
+    public function quiz()
+    {
+        return $this->belongsTo(Quiz::class, 'quiz_id');
     }
 }

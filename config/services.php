@@ -38,4 +38,14 @@ return [
         'key' => env('GEMINI_API_KEY'),
     ],
 
+    'groq' => [
+        'key'   => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.1-70b-versatile'),
+    ],
+    
+    'google' => [
+        'client_id'     => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect'      => env('GOOGLE_REDIRECT_URL'),
+    ],
 ];
