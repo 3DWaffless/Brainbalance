@@ -1,18 +1,21 @@
+# Stage 1: Build Vite / Tailwind CSS assets
+FROM node:20-slim AS frontend
+WORKDIR /app
+COPY . .
+RUN npm install && npm run build
+
+# Stage 2: PHP 8.3 + Apache + SQLite runtime
 FROM php:8.3-apache
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     unzip \
+    sqlite3 \
+    libsqlite3-dev \
     libzip-dev \
     libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libsqlite3-dev \
-    sqlite3 \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && docker-php-ext-install pdo_sqlite sqlite3 mbstring xml zip gd bcmath \
+    && docker-php-ext-install zip gd bcmath \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN a2enmod rewrite
@@ -25,11 +28,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 COPY . .
+COPY --from=frontend /app/public/build ./public/build
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
-    && npm ci \
-    && npm run build \
-    && rm -rf node_modules
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 COPY start.sh /usr/local/bin/start.sh
 RUN sed -i 's/\r$//' /usr/local/bin/start.sh \
