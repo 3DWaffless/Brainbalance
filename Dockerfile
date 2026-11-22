@@ -4,7 +4,7 @@ WORKDIR /app
 COPY . .
 RUN npm install && npm run build
 
-# Stage 2: PHP 8.4 + Apache + SQLite runtime
+# Stage 2: PHP 8.4 + Apache + PostgreSQL & SQLite runtime
 FROM php:8.4-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,9 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     sqlite3 \
     libsqlite3-dev \
+    libpq-dev \
     libzip-dev \
     libpng-dev \
-    && docker-php-ext-install zip gd bcmath \
+    && docker-php-ext-install pdo_pgsql pgsql zip gd bcmath \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN a2enmod rewrite
