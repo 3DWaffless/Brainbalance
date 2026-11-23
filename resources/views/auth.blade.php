@@ -55,18 +55,20 @@
             --role-shadow: #A3E635;
         }
 
-        /* Atmospheric Multi-Color Spectrum Background */
+        /* Landing Page Background Image (public/images/bglandingpage.png) */
         body {
             font-family: 'Nunito', sans-serif;
             color: #0D2B4E;
-            background-color: #F5FAFF;
+            min-height: 100vh;
+            background-color: #F5FAFF !important;
             background-image:
-                radial-gradient(at 6% 8%, rgba(0, 102, 214, 0.16) 0px, transparent 42%),
-                radial-gradient(at 45% 4%, rgba(29, 196, 223, 0.18) 0px, transparent 42%),
-                radial-gradient(at 92% 14%, rgba(104, 204, 24, 0.17) 0px, transparent 44%),
-                radial-gradient(at 86% 86%, rgba(255, 132, 0, 0.16) 0px, transparent 46%),
-                radial-gradient(#CBE6FF 2px, transparent 2px);
-            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 34px 34px;
+                linear-gradient(180deg, rgba(245, 250, 255, 0.28) 0%, rgba(245, 250, 255, 0.38) 100%),
+                url('{{ asset('images/bglandingpage.png') }}'),
+                url('{{ asset('bglandingpage.png') }}') !important;
+            background-size: cover !important;
+            background-position: center center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
             overflow-x: hidden;
         }
 
