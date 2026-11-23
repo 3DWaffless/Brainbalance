@@ -422,7 +422,7 @@
             </a>
         @elseif(!$isStudent)
             <a href="{{ route('quiz.create') }}" class="btn-hero-create">
-                <span>+</span> Create / Question Bank
+                <span>+</span> Create Quiz
             </a>
         @endif
     </div>
