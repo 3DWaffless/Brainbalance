@@ -406,7 +406,7 @@
     <div>
         <div class="hero-eyebrow">{{ $isStudent ? 'ADVENTURE ARENA' : 'WORKSPACE' }}</div>
         <h1 class="hero-heading">
-            {{ $isStudent ? '⚔️ Quiz Quests' : 'Quizzes & Drafts 📝' }}
+            {{ $isStudent ? 'Quizzes' : 'Quizzes & Drafts' }}
         </h1>
         <p class="hero-subtext">
             {{ $isStudent
@@ -440,7 +440,7 @@
                     🟢 Published ({{ $publishedCount }})
                 </button>
                 <button type="button" class="quiz-tab-btn" onclick="filterQuizCards('draft', this)">
-                    📝 Drafts ({{ $draftCount }})
+                    Draft ({{ $draftCount }})
                 </button>
             </div>
         @else
@@ -581,14 +581,14 @@
                             <form action="{{ route('quiz.unpublish', $quiz->id) }}" method="POST" class="flex-action-form">
                                 @csrf
                                 <button type="submit" class="btn-q-unpublish">
-                                    ⏸️ Unpublish
+                                    Unpublish
                                 </button>
                             </form>
                         @else
                             <form action="{{ route('quiz.publish', $quiz->id) }}" method="POST" class="flex-action-form">
                                 @csrf
                                 <button type="submit" class="btn-q-publish">
-                                    🚀 Publish
+                                    Publish
                                 </button>
                             </form>
                         @endif
