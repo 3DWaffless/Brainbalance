@@ -11,19 +11,19 @@
         <div class="card-tactile flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white w-full">
             <div>
                 <h1 class="text-xl sm:text-2xl md:text-3xl font-black text-brand-text flex items-center gap-2">
-                    Teacher Workspace 🧑‍🏫
+                    Teacher Workspace
                 </h1>
                 <p class="text-xs sm:text-sm font-extrabold text-gray-400 mt-1">
-                    Create classes, generate AI quizzes, and track student progress.
+                    Create classes, Formulate quizzes, and track student progress.
                 </p>
             </div>
 
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
                 <a href="{{ route('quiz.create') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
-                    ⚡ Generate AI Quiz
+                    Create Quiz
                 </a>
                 <button type="button" onclick="document.getElementById('create-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2.5 px-4">
-                    ➕ Create Class
+                    Create Class
                 </button>
             </div>
         </div>
