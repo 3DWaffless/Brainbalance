@@ -16,7 +16,15 @@ class SubjectController extends Controller
 {
     protected function activeDisk(): string
     {
-        return config('filesystems.default') === 'supabase' ? 'supabase' : 'public';
+        if (config('filesystems.default') === 'supabase' || filled(config('filesystems.disks.supabase.key'))) {
+            return 'supabase';
+        }
+
+        if (app()->environment('production')) {
+            throw new \RuntimeException('SUPABASE_S3_KEY is not configured in Render Environment Variables.');
+        }
+
+        return 'public';
     }
 
     protected function resolveDiskForPath(?string $path): ?string
