@@ -216,7 +216,7 @@
                     <div id="field-video-wrap" class="mb-3 hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Upload Video File (MP4, WebM, MOV)</label>
+                                <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Upload Video File (MP4, WebM, MOV &bull; Max 50MB)</label>
                                 <input type="file" name="video_file" id="field-video-file" accept="video/*"
                                        class="w-full p-2 rounded-xl border-2 border-dashed border-[#93C5FD] bg-white text-xs font-bold text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#ECFEFF] file:text-[#0E7490] cursor-pointer">
                             </div>
@@ -388,22 +388,38 @@
                             <!-- TYPE: VIDEO LESSON -->
                             @if($postType === 'video')
                                 @if($post->file_path && $isVideoFile)
+                                    @php
+                                        $videoMime = match($ext) {
+                                            'webm' => 'video/webm',
+                                            'ogg'  => 'video/ogg',
+                                            default => 'video/mp4',
+                                        };
+                                    @endphp
                                     <div class="bg-black rounded-2xl overflow-hidden border-2 border-[#99E2F5] mb-2">
-                                        <video src="{{ route('announcements.view', $post->id) }}" controls class="w-full max-h-[380px]"></video>
+                                        <video controls playsinline preload="metadata" class="w-full max-h-[420px]">
+                                            <source src="{{ route('announcements.view', $post->id) }}" type="{{ $videoMime }}">
+                                            Your browser does not support the video tag.
+                                        </video>
                                     </div>
                                     <div class="flex justify-end">
                                         <a href="{{ route('announcements.download', $post->id) }}" class="btn-tactile-ghost text-xs py-1.5 px-3">
                                             ⬇️ Download Video
                                         </a>
                                     </div>
-                                @elseif($post->embed_video_url)
+                                @elseif($post->embed_video_url || $post->video_url)
+                                    @php
+                                        $rawUrl = trim((string) ($post->embed_video_url ?: $post->video_url));
+                                        $embedUrl = $rawUrl;
+
+                                        if (preg_match('~(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})~', $rawUrl, $m)) {
+                                            $embedUrl = 'https://www.youtube.com/embed/' . $m[1];
+                                        } elseif (preg_match('~drive\.google\.com/file/d/([^/]+)~', $rawUrl, $m)) {
+                                            $embedUrl = 'https://drive.google.com/file/d/' . $m[1] . '/preview';
+                                        }
+                                    @endphp
                                     <div class="relative w-full overflow-hidden rounded-2xl border-2 border-[#99E2F5] bg-black" style="padding-top: 56.25%;">
-                                        <iframe src="{{ $post->embed_video_url }}" class="absolute inset-0 w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                        <iframe src="{{ $embedUrl }}" class="absolute inset-0 w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                                     </div>
-                                @elseif($post->video_url)
-                                    <a href="{{ $post->video_url }}" target="_blank" rel="noopener" class="btn-tactile-teal text-xs py-2 px-4 inline-flex items-center gap-2">
-                                        🎬 Watch Video Link &nearr;
-                                    </a>
                                 @endif
                             @endif
 
@@ -856,6 +872,7 @@
             const video = document.createElement('video');
             video.src = url;
             video.controls = true;
+            video.playsInline = true;
             video.autoplay = true;
             video.className = 'w-full max-h-[62vh] rounded-xl bg-black shadow-md';
             body.appendChild(video);

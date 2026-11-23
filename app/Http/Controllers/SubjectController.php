@@ -8,6 +8,7 @@ use App\Models\Module;
 use App\Models\Quiz;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -31,7 +32,7 @@ class SubjectController extends Controller
                 return $primary;
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning(
+            Log::warning(
                 "Storage check failed on [{$primary}] for [{$path}]: " . ($e->getPrevious()?->getMessage() ?? $e->getMessage())
             );
         }
@@ -47,6 +48,23 @@ class SubjectController extends Controller
         }
 
         return null;
+    }
+
+    protected function supabasePublicUrl(string $path): ?string
+    {
+        if ($this->activeDisk() !== 'supabase') {
+            return null;
+        }
+
+        $endpoint = rtrim((string) config('filesystems.disks.supabase.endpoint'), '/');
+        $bucket   = trim((string) config('filesystems.disks.supabase.bucket'), '/');
+
+        if ($endpoint === '' || $bucket === '') {
+            return null;
+        }
+
+        $publicBase = preg_replace('#/storage/v1/s3$#', '/storage/v1/object/public', $endpoint);
+        return $publicBase . '/' . $bucket . '/' . ltrim($path, '/');
     }
 
     public function index()
@@ -246,6 +264,10 @@ class SubjectController extends Controller
 
         $disk = $this->resolveDiskForPath($announcement->file_path);
         abort_unless($disk, 404);
+
+        if ($disk === 'supabase' && ($publicUrl = $this->supabasePublicUrl($announcement->file_path))) {
+            return redirect()->away($publicUrl);
+        }
 
         $fileName = $announcement->file_name ?? 'attachment';
         return Storage::disk($disk)->response($announcement->file_path, $fileName, [
