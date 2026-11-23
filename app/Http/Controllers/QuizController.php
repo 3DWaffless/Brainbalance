@@ -184,9 +184,7 @@ class QuizController extends Controller
             $correctAnswers = $q->correct_answers;
         } elseif ($type === 'multiple_select' || $type === 'fill_blank') {
             $decoded = json_decode((string) $q->correct_answer, true);
-            $correctAnswers = is_array($decoded)
-                ? $decoded
-                : (trim((string) $q->correct_answer) !== '' ? [trim((string) $q->correct_answer)] : []);
+            $correctAnswers = is_array($decoded) ? $decoded : (trim((string) $q->correct_answer) !== '' ? [trim((string) $q->correct_answer)] : []);
         } elseif ($type === 'matching') {
             $correctAnswers = $matchingPairs;
         } else {
@@ -616,10 +614,52 @@ class QuizController extends Controller
         return $attributes;
     }
 
+    /**
+     * Find an existing quiz by quiz_id or draft_token owned by the current user so auto-saves never create duplicates.
+     */
+    protected function findExistingDraftForUser($user, Request $request): ?Quiz
+    {
+        $allowedClassIds = $user->role === 'admin'
+            ? Classroom::pluck('id')
+            : $user->ownedClasses()->pluck('id');
+
+        if ($request->filled('quiz_id')) {
+            $byId = Quiz::where('id', (int) $request->input('quiz_id'))
+                ->whereIn('class_id', $allowedClassIds)
+                ->first();
+            if ($byId) {
+                return $byId;
+            }
+        }
+
+        $draftToken = trim((string) $request->input('draft_token', ''));
+        if ($draftToken !== '') {
+            $candidates = Quiz::whereIn('class_id', $allowedClassIds)
+                ->latest('id')
+                ->limit(25)
+                ->get();
+
+            foreach ($candidates as $candidate) {
+                $cfg = is_array($candidate->config) ? $candidate->config : [];
+                if (($cfg['draft_token'] ?? '') === $draftToken) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function store(Request $request)
     {
         $user = Auth::user();
         abort_unless($this->canManageQuizzes($user), 403);
+
+        // If this session already created/owns a quiz (via quiz_id or draft_token), update it in place instead of creating a duplicate
+        $existingQuiz = $this->findExistingDraftForUser($user, $request);
+        if ($existingQuiz) {
+            return $this->update($request, $existingQuiz);
+        }
 
         $isAutoSave = $request->boolean('auto_save') || $request->expectsJson() || $request->ajax();
 
@@ -627,6 +667,8 @@ class QuizController extends Controller
             $request->validate([
                 'class_id'               => 'required|exists:classes,id',
                 'topic_id'               => 'nullable|integer',
+                'quiz_id'                => 'nullable|integer',
+                'draft_token'            => 'nullable|string|max:120',
                 'quiz_title'             => 'nullable|string|max:255',
                 'subject'                => 'nullable|string|max:255',
                 'max_attempts'           => 'nullable|integer|min:1',
@@ -634,6 +676,7 @@ class QuizController extends Controller
                 'deadline_at'            => 'nullable|date',
                 'save_action'            => 'nullable|string|in:draft,publish',
                 'questions'              => 'nullable|array',
+                'questions.*.id'         => 'nullable|integer',
                 'questions.*.text'       => 'nullable|string',
                 'questions.*.type'       => 'nullable|string|in:' . implode(',', self::QUESTION_TYPES),
                 'questions.*.options'    => 'nullable|array',
@@ -657,6 +700,8 @@ class QuizController extends Controller
             $request->validate([
                 'class_id'               => 'required|exists:classes,id',
                 'topic_id'               => 'nullable|integer',
+                'quiz_id'                => 'nullable|integer',
+                'draft_token'            => 'nullable|string|max:120',
                 'quiz_title'             => 'required|string|max:255',
                 'subject'                => 'required|string|max:255',
                 'max_attempts'           => 'nullable|integer|min:1',
@@ -677,10 +722,19 @@ class QuizController extends Controller
         $hasQuizId = $this->hasQuestionsQuizIdColumn();
         $hasPivot  = $this->hasQuizQuestionsPivotTable();
         $isPublish = !$isAutoSave && $request->input('save_action', 'publish') === 'publish';
+        $draftToken = trim((string) $request->input('draft_token', ''));
 
-        $createdQuiz = DB::transaction(function () use ($request, $hasQuizId, $hasPivot, $isPublish) {
+        $result = DB::transaction(function () use ($request, $hasQuizId, $hasPivot, $isPublish, $draftToken) {
             $title = trim((string) $request->input('quiz_title', '')) ?: 'Untitled Draft Quiz';
             $subject = trim((string) $request->input('subject', '')) ?: 'General';
+
+            $config = [
+                'is_draft'             => !$isPublish,
+                'scheduled_publish_at' => $request->published_at,
+            ];
+            if ($draftToken !== '') {
+                $config['draft_token'] = $draftToken;
+            }
 
             $quizAttributes = [
                 'class_id'     => $request->class_id,
@@ -688,10 +742,7 @@ class QuizController extends Controller
                 'title'        => $title,
                 'subject'      => $subject,
                 'type'         => $request->quiz_mode ?? 'standard',
-                'config'       => [
-                    'is_draft'             => !$isPublish,
-                    'scheduled_publish_at' => $request->published_at,
-                ],
+                'config'       => $config,
                 'published_at' => $isPublish ? ($request->published_at ?? now()) : null,
                 'deadline_at'  => $request->deadline_at ?? now()->addDays(7),
                 'max_attempts' => $request->max_attempts ?? 1,
@@ -722,16 +773,22 @@ class QuizController extends Controller
                 $quiz->questions()->syncWithoutDetaching($questionIds);
             }
 
-            return $quiz;
+            return [
+                'quiz'         => $quiz,
+                'question_ids' => $questionIds,
+            ];
         });
+
+        $createdQuiz = $result['quiz'];
 
         if ($isAutoSave) {
             return response()->json([
-                'success'    => true,
-                'quiz_id'    => $createdQuiz->id,
-                'update_url' => route('quiz.update', $createdQuiz),
-                'status'     => 'draft',
-                'saved_at'   => now()->format('h:i:s A'),
+                'success'      => true,
+                'quiz_id'      => $createdQuiz->id,
+                'update_url'   => route('quiz.update', $createdQuiz),
+                'question_ids' => $result['question_ids'],
+                'status'       => 'draft',
+                'saved_at'     => now()->format('h:i:s A'),
             ]);
         }
 
@@ -817,6 +874,8 @@ class QuizController extends Controller
         $request->validate([
             'title'                  => 'nullable|string|max:255',
             'quiz_title'             => 'nullable|string|max:255',
+            'quiz_id'                => 'nullable|integer',
+            'draft_token'            => 'nullable|string|max:120',
             'class_id'               => 'nullable|exists:classes,id',
             'subject'                => 'nullable|string|max:255',
             'max_attempts'           => 'nullable|integer|min:1',
@@ -837,8 +896,9 @@ class QuizController extends Controller
         $hasQuizId = $this->hasQuestionsQuizIdColumn();
         $hasPivot  = $this->hasQuizQuestionsPivotTable();
         $isPublish = !$isAutoSave && $request->input('save_action', 'publish') === 'publish';
+        $draftToken = trim((string) $request->input('draft_token', ''));
 
-        $keptIds = DB::transaction(function () use ($request, $quiz, $hasQuizId, $hasPivot, $isPublish) {
+        $keptIds = DB::transaction(function () use ($request, $quiz, $hasQuizId, $hasPivot, $isPublish, $draftToken) {
             $incomingTitle = trim((string) $request->input('quiz_title', $request->input('title', '')));
             if ($incomingTitle !== '') {
                 $quiz->title = $incomingTitle;
@@ -858,6 +918,9 @@ class QuizController extends Controller
 
             $config = is_array($quiz->config) ? $quiz->config : [];
             $config['is_draft'] = !$isPublish;
+            if ($draftToken !== '') {
+                $config['draft_token'] = $draftToken;
+            }
             if ($request->filled('published_at')) {
                 $config['scheduled_publish_at'] = $request->published_at;
             }
@@ -879,15 +942,16 @@ class QuizController extends Controller
             $quiz->save();
 
             $savedQuestionIds = [];
-            if ($request->has('questions') || $request->boolean('sync_questions')) {
-                $incomingQuestions = (array) $request->input('questions', []);
-                $existingQuestions = Question::whereIn('id', collect($incomingQuestions)->pluck('id')->filter())->get()->keyBy('id');
+            if ($request->has('questions')) {
+                $incomingIds = collect($request->questions)->pluck('id')->filter()->map(fn ($v) => (int) $v);
+                $existingQuestions = Question::whereIn('id', $incomingIds)->get()->keyBy('id');
 
-                foreach ($incomingQuestions as $qData) {
+                foreach ((array) $request->questions as $qData) {
                     $attributes = $this->buildQuestionAttributes($qData, $quiz->topic_id);
+                    $qId = !empty($qData['id']) ? (int) $qData['id'] : null;
 
-                    if (!empty($qData['id']) && $existingQuestions->has($qData['id'])) {
-                        $question = $existingQuestions->get($qData['id']);
+                    if ($qId && $existingQuestions->has($qId)) {
+                        $question = $existingQuestions->get($qId);
                         $question->update($attributes);
                     } else {
                         if ($hasQuizId) {
@@ -913,6 +977,7 @@ class QuizController extends Controller
             return response()->json([
                 'success'      => true,
                 'quiz_id'      => $quiz->id,
+                'update_url'   => route('quiz.update', $quiz),
                 'status'       => $isPublish ? 'published' : 'draft',
                 'question_ids' => $keptIds,
                 'saved_at'     => now()->format('h:i:s A'),

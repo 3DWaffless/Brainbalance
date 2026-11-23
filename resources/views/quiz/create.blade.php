@@ -641,7 +641,7 @@
     </div>
 
     <div id="restoredDraftNotice" class="notice-banner" style="display: none;">
-        ✨ Your unsaved quiz edits were automatically restored after refresh and synced as a draft.
+        ✨ Your unsaved quiz edits were automatically restored after refresh and synced to this draft.
     </div>
 
     @if (session('info'))
@@ -699,6 +699,8 @@
                         @endif
                     </div>
 
+                    <input type="hidden" name="quiz_id" id="quizIdInput" value="{{ $isEditing ? $editingQuiz->id : '' }}">
+                    <input type="hidden" name="draft_token" id="draftTokenInput" value="">
                     <input type="hidden" name="class_id" id="manualClassId" value="{{ $selectedClass->id ?? ($classes->first()->id ?? '') }}">
                     <input type="hidden" name="save_action" id="saveActionInput" value="publish">
 
@@ -806,7 +808,7 @@
                     🏦 <strong>Question Bank:</strong> Click <strong>Question Bank</strong> to search and pull questions from any quiz you already published, separated per quiz.
                 </div>
                 <div class="sidebar-item accent-green">
-                    💾 <strong>Auto-Draft Protection:</strong> Your edits stay saved even if you refresh the page, and leaving the editor automatically saves your quiz as a <strong>Draft</strong>.
+                    💾 <strong>Auto-Draft Protection:</strong> Your edits stay saved even if you refresh the page, and closing or leaving the editor automatically updates this exact quiz as a <strong>Draft</strong> without creating duplicates.
                 </div>
                 <div class="sidebar-item accent-amber">
                     ⏱️ <strong>Flexible Timers:</strong> Set each question's timer in <strong>Seconds</strong>, <strong>Minutes</strong>, or <strong>Hours</strong> using the unit dropdown.
@@ -1009,12 +1011,17 @@
     const CSRF_TOKEN = @json(csrf_token());
 
     const USER_STORAGE_PREFIX = 'bb_quiz_draft_u' + @json(Auth::id() ?? 'guest');
-    let activeQuizId = @json($isEditing ? $editingQuiz->id : null);
-    let activeUpdateUrl = @json($isEditing ? route('quiz.update', $editingQuiz) : null);
+    const LOCKED_EDIT_QUIZ_ID = @json($isEditing ? $editingQuiz->id : null);
+    const LOCKED_EDIT_UPDATE_URL = @json($isEditing ? route('quiz.update', $editingQuiz) : null);
+
+    let activeQuizId = LOCKED_EDIT_QUIZ_ID;
+    let activeUpdateUrl = LOCKED_EDIT_UPDATE_URL;
+    let activeDraftToken = @json($isEditing ? ($editingQuiz->config['draft_token'] ?? '') : '');
 
     let isExplicitSubmit = false;
     let isDirty = false;
     let isAutoSaving = false;
+    let exitKeepaliveSent = false;
     let autoSaveDebounceTimer = null;
     let lastServerSyncMs = 0;
 
@@ -1052,6 +1059,21 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function generateDraftToken() {
+        return 'bb_draft_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    function ensureDraftToken() {
+        if (!activeDraftToken) {
+            activeDraftToken = generateDraftToken();
+        }
+        const tokenInput = document.getElementById('draftTokenInput');
+        if (tokenInput) {
+            tokenInput.value = activeDraftToken;
+        }
+        return activeDraftToken;
     }
 
     function getDraftStorageKey(quizId = activeQuizId) {
@@ -1134,6 +1156,7 @@
         return {
             quizId: activeQuizId,
             updateUrl: activeUpdateUrl,
+            draftToken: ensureDraftToken(),
             classId: document.getElementById('manualClassId')?.value || '',
             quizTitle: document.getElementById('quizTitleInput')?.value || '',
             subject: document.getElementById('quizSubjectInput')?.value || 'General',
@@ -1167,9 +1190,20 @@
 
     function switchFormToEditMode(quizId, updateUrl) {
         if (!quizId || !updateUrl) return;
+
+        // If this page was opened specifically to edit a locked quiz ID, never switch to another ID
+        if (LOCKED_EDIT_QUIZ_ID && Number(quizId) !== Number(LOCKED_EDIT_QUIZ_ID)) {
+            return;
+        }
+
         const wasNew = !activeQuizId;
         activeQuizId = quizId;
         activeUpdateUrl = updateUrl;
+
+        const quizIdInput = document.getElementById('quizIdInput');
+        if (quizIdInput) {
+            quizIdInput.value = quizId;
+        }
 
         const form = document.getElementById('manualForm');
         if (form) {
@@ -1194,11 +1228,18 @@
 
     function buildAutoSaveFormData() {
         reindexAllCards();
+        ensureDraftToken();
+
         const form = document.getElementById('manualForm');
         const formData = new FormData(form);
 
         formData.set('auto_save', '1');
         formData.set('save_action', 'draft');
+        formData.set('draft_token', activeDraftToken);
+
+        if (activeQuizId) {
+            formData.set('quiz_id', String(activeQuizId));
+        }
 
         if (activeUpdateUrl) {
             formData.set('_method', 'PUT');
@@ -1224,19 +1265,19 @@
 
     async function saveDraftToServer({ useKeepalive = false, force = false } = {}) {
         if (isExplicitSubmit) return false;
-        if (!force && !isDirty && !useKeepalive) return false;
+        if (!force && !isDirty) return false;
         if (!activeQuizId && !hasMeaningfulDraftContent()) return false;
 
-        if (isAutoSaving && !useKeepalive) {
-            return false;
-        }
-
-        const targetUrl = activeUpdateUrl || STORE_URL;
-        const formData = buildAutoSaveFormData();
-
         if (useKeepalive) {
+            // Prevent duplicate requests when both visibilitychange and pagehide fire on tab close
+            if (exitKeepaliveSent) return false;
+            exitKeepaliveSent = true;
+
             try {
+                const targetUrl = activeUpdateUrl || STORE_URL;
+                const formData = buildAutoSaveFormData();
                 persistLocalSnapshot(0);
+
                 fetch(targetUrl, {
                     method: 'POST',
                     body: formData,
@@ -1252,10 +1293,17 @@
             }
         }
 
+        if (isAutoSaving) {
+            return false;
+        }
+
         isAutoSaving = true;
         setAutoSaveStatus('saving', '⏳ Saving draft...');
 
         try {
+            const targetUrl = activeUpdateUrl || STORE_URL;
+            const formData = buildAutoSaveFormData();
+
             const response = await fetch(targetUrl, {
                 method: 'POST',
                 body: formData,
@@ -1291,6 +1339,7 @@
             }
 
             isDirty = false;
+            exitKeepaliveSent = false;
             lastServerSyncMs = Date.now();
             persistLocalSnapshot(lastServerSyncMs);
             setAutoSaveStatus('saved', `💾 Draft saved • ${data.saved_at || 'just now'}`);
@@ -1306,6 +1355,7 @@
     function markDraftDirty(immediateSync = false) {
         if (isExplicitSubmit) return;
         isDirty = true;
+        exitKeepaliveSent = false;
         persistLocalSnapshot(0);
         setAutoSaveStatus('dirty', '📝 Unsaved changes...');
 
@@ -1315,7 +1365,7 @@
         } else {
             autoSaveDebounceTimer = setTimeout(() => {
                 saveDraftToServer();
-            }, 1200);
+            }, 900);
         }
     }
 
@@ -1327,7 +1377,6 @@
         if (isDirty || (!activeQuizId && hasMeaningfulDraftContent())) {
             event.preventDefault();
             clearTimeout(autoSaveDebounceTimer);
-            const originalHtml = link.innerHTML;
             link.innerHTML = '💾 Saving Draft...';
             link.style.pointerEvents = 'none';
 
@@ -1347,14 +1396,23 @@
                 return false;
             }
 
-            // Only restore if there were edits saved after the last confirmed server sync
-            // OR if we are on /quiz/create with a previously auto-saved quiz
+            // If we are on /quiz/{id}/edit, reject any snapshot that does not belong to this quiz ID
+            if (LOCKED_EDIT_QUIZ_ID && saved.quizId && Number(saved.quizId) !== Number(LOCKED_EDIT_QUIZ_ID)) {
+                return false;
+            }
+
+            if (saved.draftToken && !activeDraftToken) {
+                activeDraftToken = saved.draftToken;
+                ensureDraftToken();
+            }
+
+            // Only restore if there were edits made after the last confirmed server sync
             const hasUnsyncedEdits = !saved.syncedAt || saved.updatedAt > saved.syncedAt;
             if (!hasUnsyncedEdits && activeQuizId) {
                 return false;
             }
 
-            if (saved.quizId && saved.updateUrl) {
+            if (!LOCKED_EDIT_QUIZ_ID && saved.quizId && saved.updateUrl) {
                 switchFormToEditMode(saved.quizId, saved.updateUrl);
             }
 
@@ -2297,6 +2355,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        ensureDraftToken();
         const wasRestored = restoreDraftSnapshotIfAvailable();
 
         if (!wasRestored) {
@@ -2305,6 +2364,8 @@
             } else {
                 addQuestionCard({ type: 'multiple_choice' }, true);
             }
+            // Record baseline state so closing without making edits does not create duplicate requests
+            persistLocalSnapshot(Date.now());
         } else {
             isDirty = true;
             saveDraftToServer({ force: true });
@@ -2327,18 +2388,18 @@
             });
         }
 
-        // Automatically save as draft when tab is hidden, refreshed, or closed
+        // Deduplicated exit save: fires at most once per dirty edit cycle when closing or hiding tab
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'hidden' && !isExplicitSubmit) {
                 clearTimeout(autoSaveDebounceTimer);
-                saveDraftToServer({ useKeepalive: true, force: true });
+                saveDraftToServer({ useKeepalive: true, force: false });
             }
         });
 
         window.addEventListener('pagehide', function() {
             if (!isExplicitSubmit) {
                 clearTimeout(autoSaveDebounceTimer);
-                saveDraftToServer({ useKeepalive: true, force: true });
+                saveDraftToServer({ useKeepalive: true, force: false });
             }
         });
 
