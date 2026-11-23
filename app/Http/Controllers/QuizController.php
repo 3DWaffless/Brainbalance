@@ -283,6 +283,48 @@ class QuizController extends Controller
         return view('quiz.index', compact('quizzes'));
     }
 
+    public function history(Request $request)
+    {
+        $user = Auth::user();
+
+        $query = QuizAttempt::with(['quiz.classroom', 'student'])->latest();
+
+        if ($user->role === 'admin') {
+            // Admins can view all quiz attempts across the platform
+        } elseif ($this->canManageQuizzes($user)) {
+            $classIds = $user->ownedClasses()->pluck('id');
+
+            $query->where(function ($q) use ($classIds, $user) {
+                $q->whereHas('quiz', function ($quizQuery) use ($classIds) {
+                    $quizQuery->whereIn('class_id', $classIds);
+                })->orWhere('student_id', $user->id);
+            });
+        } else {
+            $query->where('student_id', $user->id);
+        }
+
+        $attempts = $query->paginate(10);
+
+        return view('quiz.history', compact('attempts'));
+    }
+
+    public function review(QuizAttempt $attempt)
+    {
+        $user = Auth::user();
+        $attempt->load(['quiz.classroom', 'student', 'responses.question']);
+
+        $isStudentOwner = (int) $attempt->student_id === (int) $user->id;
+        $isClassTeacher = $this->canManageQuizzes($user)
+            && ($user->role === 'admin' || $user->ownedClasses()->where('id', $attempt->quiz?->class_id)->exists());
+
+        abort_unless($isStudentOwner || $isClassTeacher, 403);
+
+        $quiz = $attempt->quiz;
+        $responses = $attempt->responses;
+
+        return view('quiz.review', compact('attempt', 'quiz', 'responses'));
+    }
+
     public function create(Request $request)
     {
         $user = Auth::user();

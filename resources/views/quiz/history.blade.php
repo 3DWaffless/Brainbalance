@@ -4,24 +4,27 @@
 @section('title', 'Quiz History - ' . config('app.name', 'BrainBalance'))
 
 @section('content')
+@php
+    $isStaff = in_array(auth()->user()->role ?? '', ['teacher', 'admin'], true);
+@endphp
 <div class="flex flex-col gap-6 sm:gap-8 w-full">
     <!-- Header -->
     <div class="card-tactile flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
          style="background: linear-gradient(135deg, #EBF5FF 0%, #FFFFFF 55%, #FEF9C3 100%) !important;">
         <div>
             <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white border border-sky-200 text-[10px] font-black text-brand-coral uppercase tracking-wider mb-1">
-                📜 Explorer Logbook
+                📜 {{ $isStaff ? 'Class Assessment Log' : 'Explorer Logbook' }}
             </div>
             <h1 class="font-display text-2xl md:text-3xl font-bold text-brand-text flex items-center gap-2">
-                My Quiz History 🏆
+                {{ $isStaff ? 'Student Quiz History 🏆' : 'My Quiz History 🏆' }}
             </h1>
             <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
-                Review past quests, check your XP stars, and learn from every question.
+                {{ $isStaff ? 'Inspect student quiz submissions, accuracy scores, and question-by-question answers.' : 'Review past quests, check your XP stars, and learn from every question.' }}
             </p>
         </div>
         <div class="flex flex-wrap items-center gap-2.5">
             <a href="{{ route('quiz.index') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
-                ⚔️ Play New Quest
+                {{ $isStaff ? '📋 Manage Quizzes' : '⚔️ Play New Quest' }}
             </a>
             <a href="{{ route('dashboard') }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
                 &larr; Dashboard
@@ -33,7 +36,7 @@
     <div class="card-tactile">
         <div class="flex justify-between items-center mb-5 pb-3 border-b-4 border-dashed border-brand-border">
             <h2 class="font-display text-lg sm:text-xl font-bold text-brand-text flex items-center gap-2">
-                ✅ Completed Quests
+                ✅ {{ $isStaff ? 'Submitted Attempts' : 'Completed Quests' }}
             </h2>
             <span class="px-3 py-1 rounded-full bg-lime-100 border border-lime-300 text-lime-800 font-black text-xs">
                 {{ $attempts->total() }} Total
@@ -57,6 +60,8 @@
 
                         $accuracy = $attempt->total_questions > 0 ? round(($attempt->score / $attempt->total_questions) * 100) : 0;
                         $rankIcon = $accuracy >= 90 ? '🥇' : ($accuracy >= 70 ? '🥈' : '⭐');
+                        $studentFullName = trim(($attempt->student->first_name ?? '') . ' ' . ($attempt->student->last_name ?? ''))
+                            ?: ($attempt->student->name ?? 'Student');
                     @endphp
                     <div class="card-tactile-interactive flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                         <div class="flex items-start gap-3.5">
@@ -73,6 +78,9 @@
                                     </span>
                                 </div>
                                 <p class="text-xs font-bold text-slate-500 mt-1">
+                                    @if($isStaff)
+                                        <span class="text-brand-text font-extrabold">👤 {{ $studentFullName }}</span> &bull;
+                                    @endif
                                     🏫 {{ $quiz->classroom->name ?? 'Unknown' }} &bull;
                                     📅 {{ $attempt->created_at->format('M d, Y g:i A') }} &bull;
                                     ⏱️ {{ floor(($attempt->time_taken_seconds ?? 0) / 60) }}m {{ ($attempt->time_taken_seconds ?? 0) % 60 }}s
@@ -115,7 +123,7 @@
                 <div class="text-5xl mb-3">📭</div>
                 <h3 class="font-display text-xl font-bold text-brand-text">No Quiz History Yet</h3>
                 <p class="text-xs sm:text-sm font-bold text-slate-400 mt-1 mb-5">
-                    Complete your assigned quizzes to see your scores and answer breakdowns here!
+                    {{ $isStaff ? 'No students have completed a quiz in your classes yet.' : 'Complete your assigned quizzes to see your scores and answer breakdowns here!' }}
                 </p>
                 <a href="{{ route('quiz.index') }}" class="btn-tactile-primary text-xs py-2.5 px-5">
                     Browse Quizzes 🚀
