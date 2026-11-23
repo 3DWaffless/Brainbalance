@@ -52,10 +52,6 @@ class SubjectController extends Controller
 
     protected function supabasePublicUrl(string $path): ?string
     {
-        if ($this->activeDisk() !== 'supabase') {
-            return null;
-        }
-
         $endpoint = rtrim((string) config('filesystems.disks.supabase.endpoint'), '/');
         $bucket   = trim((string) config('filesystems.disks.supabase.bucket'), '/');
 
@@ -65,6 +61,26 @@ class SubjectController extends Controller
 
         $publicBase = preg_replace('#/storage/v1/s3$#', '/storage/v1/object/public', $endpoint);
         return $publicBase . '/' . $bucket . '/' . ltrim($path, '/');
+    }
+
+    protected function detectMimeType(string $ext): string
+    {
+        return match (strtolower($ext)) {
+            'pdf'         => 'application/pdf',
+            'png'         => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            'webp'        => 'image/webp',
+            'svg'         => 'image/svg+xml',
+            'mp3'         => 'audio/mpeg',
+            'wav'         => 'audio/wav',
+            'm4a'         => 'audio/mp4',
+            'ogg'         => 'audio/ogg',
+            'mp4'         => 'video/mp4',
+            'webm'        => 'video/webm',
+            'mov'         => 'video/quicktime',
+            default       => 'application/octet-stream',
+        };
     }
 
     public function index()
@@ -143,10 +159,10 @@ class SubjectController extends Controller
             $rules['content'] = 'required|string|max:5000';
         } elseif ($type === 'file') {
             $rules['title'] = 'required|string|max:255';
-            $rules['file']  = 'required|file|max:102400';
+            $rules['file']  = 'required|file|max:51200';
         } elseif ($type === 'video') {
             $rules['title']      = 'required|string|max:255';
-            $rules['video_file'] = 'nullable|file|mimes:mp4,webm,ogg,mov,avi,mkv|max:102400';
+            $rules['video_file'] = 'nullable|file|mimes:mp4,webm,ogg,mov,avi,mkv|max:51200';
             $rules['video_url']  = 'nullable|url|max:1000';
         } elseif ($type === 'quiz') {
             $rules['quiz_id'] = 'required|exists:quizzes,id';
@@ -155,7 +171,7 @@ class SubjectController extends Controller
             $rules['content'] = 'required|string|max:5000';
             $rules['due_at']  = 'required|date';
             $rules['points']  = 'nullable|integer|min:1|max:1000';
-            $rules['file']    = 'nullable|file|max:102400';
+            $rules['file']    = 'nullable|file|max:51200';
         }
 
         $validated = $request->validate($rules);
@@ -174,75 +190,93 @@ class SubjectController extends Controller
             'content'    => trim((string) ($validated['content'] ?? '')),
         ];
 
-        if ($type === 'file' && $request->hasFile('file')) {
-            $file = $request->file('file');
-            $path = $file->store('modules', $disk);
-            $ext  = strtolower($file->getClientOriginalExtension() ?: 'file');
-
-            $module = Module::create([
-                'class_id'  => $classroom->id,
-                'title'     => $validated['title'],
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => $path,
-                'file_type' => $ext,
-                'file_size' => $file->getSize(),
-            ]);
-
-            $data['file_path'] = $path;
-            $data['file_name'] = $file->getClientOriginalName();
-            $data['file_type'] = $ext;
-            $data['file_size'] = $file->getSize();
-            $data['module_id'] = $module->id;
-        }
-
-        if ($type === 'video') {
-            if ($request->hasFile('video_file')) {
-                $video = $request->file('video_file');
-                $path  = $video->store('modules', $disk);
-                $ext   = strtolower($video->getClientOriginalExtension() ?: 'mp4');
+        try {
+            if ($type === 'file' && $request->hasFile('file')) {
+                $file = $request->file('file');
+                $path = $file->store('modules', $disk);
+                if (!$path) {
+                    throw new \RuntimeException('Storage returned an empty path.');
+                }
+                $ext = strtolower($file->getClientOriginalExtension() ?: 'file');
 
                 $module = Module::create([
                     'class_id'  => $classroom->id,
                     'title'     => $validated['title'],
-                    'file_name' => $video->getClientOriginalName(),
+                    'file_name' => $file->getClientOriginalName(),
                     'file_path' => $path,
                     'file_type' => $ext,
-                    'file_size' => $video->getSize(),
+                    'file_size' => $file->getSize(),
                 ]);
 
                 $data['file_path'] = $path;
-                $data['file_name'] = $video->getClientOriginalName();
-                $data['file_type'] = $ext;
-                $data['file_size'] = $video->getSize();
-                $data['module_id'] = $module->id;
-            } else {
-                $data['video_url'] = trim((string) $request->video_url);
-            }
-        }
-
-        if ($type === 'quiz') {
-            $quiz = Quiz::where('class_id', $classroom->id)->findOrFail($validated['quiz_id']);
-            if (!$quiz->isPublished()) {
-                $quiz->update(['published_at' => now()]);
-            }
-            $data['quiz_id'] = $quiz->id;
-            if (empty($data['title'])) {
-                $data['title'] = $quiz->title;
-            }
-        }
-
-        if ($type === 'assignment') {
-            $data['due_at'] = $validated['due_at'];
-            $data['points'] = $validated['points'] ?? 100;
-
-            if ($request->hasFile('file')) {
-                $file = $request->file('file');
-                $path = $file->store('assignments', $disk);
-                $data['file_path'] = $path;
                 $data['file_name'] = $file->getClientOriginalName();
-                $data['file_type'] = strtolower($file->getClientOriginalExtension() ?: 'file');
+                $data['file_type'] = $ext;
                 $data['file_size'] = $file->getSize();
+                $data['module_id'] = $module->id;
             }
+
+            if ($type === 'video') {
+                if ($request->hasFile('video_file')) {
+                    $video = $request->file('video_file');
+                    $path  = $video->store('modules', $disk);
+                    if (!$path) {
+                        throw new \RuntimeException('Storage returned an empty path.');
+                    }
+                    $ext = strtolower($video->getClientOriginalExtension() ?: 'mp4');
+
+                    $module = Module::create([
+                        'class_id'  => $classroom->id,
+                        'title'     => $validated['title'],
+                        'file_name' => $video->getClientOriginalName(),
+                        'file_path' => $path,
+                        'file_type' => $ext,
+                        'file_size' => $video->getSize(),
+                    ]);
+
+                    $data['file_path'] = $path;
+                    $data['file_name'] = $video->getClientOriginalName();
+                    $data['file_type'] = $ext;
+                    $data['file_size'] = $video->getSize();
+                    $data['module_id'] = $module->id;
+                } else {
+                    $data['video_url'] = trim((string) $request->video_url);
+                }
+            }
+
+            if ($type === 'quiz') {
+                $quiz = Quiz::where('class_id', $classroom->id)->findOrFail($validated['quiz_id']);
+                if (!$quiz->isPublished()) {
+                    $quiz->update(['published_at' => now()]);
+                }
+                $data['quiz_id'] = $quiz->id;
+                if (empty($data['title'])) {
+                    $data['title'] = $quiz->title;
+                }
+            }
+
+            if ($type === 'assignment') {
+                $data['due_at'] = $validated['due_at'];
+                $data['points'] = $validated['points'] ?? 100;
+
+                if ($request->hasFile('file')) {
+                    $file = $request->file('file');
+                    $path = $file->store('assignments', $disk);
+                    if (!$path) {
+                        throw new \RuntimeException('Storage returned an empty path.');
+                    }
+                    $data['file_path'] = $path;
+                    $data['file_name'] = $file->getClientOriginalName();
+                    $data['file_type'] = strtolower($file->getClientOriginalExtension() ?: 'file');
+                    $data['file_size'] = $file->getSize();
+                }
+            }
+        } catch (\Throwable $e) {
+            $reason = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+            Log::error("Announcement upload failed on [{$disk}]: " . $reason, ['exception' => $e]);
+
+            return back()
+                ->withErrors(['file' => 'Upload failed (' . $disk . '): ' . $reason])
+                ->withInput();
         }
 
         Announcement::create($data);
@@ -265,13 +299,20 @@ class SubjectController extends Controller
         $disk = $this->resolveDiskForPath($announcement->file_path);
         abort_unless($disk, 404);
 
-        if ($disk === 'supabase' && ($publicUrl = $this->supabasePublicUrl($announcement->file_path))) {
+        $ext = strtolower($announcement->file_type ?: pathinfo((string) $announcement->file_name, PATHINFO_EXTENSION));
+        $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'], true);
+
+        if ($disk === 'supabase' && $isVideo && ($publicUrl = $this->supabasePublicUrl($announcement->file_path))) {
             return redirect()->away($publicUrl);
         }
 
         $fileName = $announcement->file_name ?? 'attachment';
-        return Storage::disk($disk)->response($announcement->file_path, $fileName, [
-            'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+        $contents = Storage::disk($disk)->get($announcement->file_path);
+
+        return response($contents, 200, [
+            'Content-Type'        => $this->detectMimeType($ext),
+            'Content-Length'      => strlen($contents),
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
         ]);
     }
 

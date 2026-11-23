@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Module;
-use App\Models\Classroom;
 use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,7 +40,7 @@ class ModuleController extends Controller
                 return $primary;
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning(
+            Log::warning(
                 "Storage check failed on [{$primary}] for [{$path}]: " . ($e->getPrevious()?->getMessage() ?? $e->getMessage())
             );
         }
@@ -57,6 +56,39 @@ class ModuleController extends Controller
         }
 
         return null;
+    }
+
+    protected function supabasePublicUrl(string $path): ?string
+    {
+        $endpoint = rtrim((string) config('filesystems.disks.supabase.endpoint'), '/');
+        $bucket   = trim((string) config('filesystems.disks.supabase.bucket'), '/');
+
+        if ($endpoint === '' || $bucket === '') {
+            return null;
+        }
+
+        $publicBase = preg_replace('#/storage/v1/s3$#', '/storage/v1/object/public', $endpoint);
+        return $publicBase . '/' . $bucket . '/' . ltrim($path, '/');
+    }
+
+    protected function detectMimeType(string $ext): string
+    {
+        return match (strtolower($ext)) {
+            'pdf'         => 'application/pdf',
+            'png'         => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            'webp'        => 'image/webp',
+            'svg'         => 'image/svg+xml',
+            'mp3'         => 'audio/mpeg',
+            'wav'         => 'audio/wav',
+            'm4a'         => 'audio/mp4',
+            'ogg'         => 'audio/ogg',
+            'mp4'         => 'video/mp4',
+            'webm'        => 'video/webm',
+            'mov'         => 'video/quicktime',
+            default       => 'application/octet-stream',
+        };
     }
 
     public function index()
@@ -84,7 +116,7 @@ class ModuleController extends Controller
         $request->validate([
             'class_id' => 'required|exists:classes,id',
             'title'    => 'required|string|max:255',
-            'file'     => 'required|file|max:102400',
+            'file'     => 'required|file|max:51200',
         ]);
 
         if ($user->role !== 'admin') {
@@ -92,7 +124,17 @@ class ModuleController extends Controller
         }
 
         $file = $request->file('file');
-        $filePath = $file->store('modules', $this->activeDisk());
+        $disk = $this->activeDisk();
+
+        try {
+            $filePath = $file->store('modules', $disk);
+            if (!$filePath) {
+                throw new \RuntimeException('Storage returned an empty path.');
+            }
+        } catch (\Throwable $e) {
+            $reason = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+            return back()->withErrors(['file' => 'Upload failed (' . $disk . '): ' . $reason])->withInput();
+        }
 
         Module::create([
             'class_id'  => $request->class_id,
@@ -106,9 +148,6 @@ class ModuleController extends Controller
         return back()->with('success', 'Module uploaded successfully!');
     }
 
-    /**
-     * Split-screen reader: document on the left, AI study assistant on the right.
-     */
     public function read(Module $module)
     {
         $this->authorizeModuleAccess($module);
@@ -133,9 +172,6 @@ class ModuleController extends Controller
         }
     }
 
-    /**
-     * Serve the file directly to the browser for inline viewing.
-     */
     public function view(Module $module)
     {
         $this->authorizeModuleAccess($module);
@@ -145,8 +181,19 @@ class ModuleController extends Controller
             abort(404, 'Module file not found on server.');
         }
 
-        return Storage::disk($disk)->response($module->file_path, $module->file_name, [
-            'Content-Disposition' => 'inline; filename="' . $module->file_name . '"',
+        $ext = strtolower($module->file_type ?: pathinfo((string) $module->file_name, PATHINFO_EXTENSION));
+        $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'], true);
+
+        if ($disk === 'supabase' && $isVideo && ($publicUrl = $this->supabasePublicUrl($module->file_path))) {
+            return redirect()->away($publicUrl);
+        }
+
+        $contents = Storage::disk($disk)->get($module->file_path);
+
+        return response($contents, 200, [
+            'Content-Type'        => $this->detectMimeType($ext),
+            'Content-Length'      => strlen($contents),
+            'Content-Disposition' => 'inline; filename="' . addslashes($module->file_name) . '"',
         ]);
     }
 
@@ -181,9 +228,6 @@ class ModuleController extends Controller
         return back()->with('success', 'Module deleted successfully!');
     }
 
-    /**
-     * Groq AI Study Assistant Handler with PDF Document Context.
-     */
     public function aiChat(Request $request, Module $module)
     {
         $tempFile = null;
@@ -230,7 +274,6 @@ class ModuleController extends Controller
                 $fullPath = $tempFile;
             }
 
-            // Recent chat turns so follow-up questions ("explain that again") work.
             $history = collect($request->input('history', []))
                 ->filter(fn ($m) => is_array($m)
                     && in_array($m['role'] ?? null, ['user', 'assistant'], true)
