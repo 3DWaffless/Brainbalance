@@ -109,7 +109,7 @@ Route::middleware('auth')->group(function () {
 
     // Profile & Settings Routes
     Route::get('/settings', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::put('/settings', [ProfileController::class, 'update'])->name('profile.update');
+    Route::match(['put', 'patch'], '/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/settings', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

@@ -46,7 +46,7 @@
 
             <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-5">
                 @csrf
-                @method('PATCH')
+                @method('PUT')
 
                 <!-- Profile Picture -->
                 <div>
@@ -63,7 +63,7 @@
 
                         <div class="flex-1 min-w-[200px]">
                             <input type="file" name="avatar" accept="image/*" class="w-full text-xs font-bold text-[#5A7696] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-2 file:border-[#99E2F5] file:text-xs file:font-black file:bg-[#E6F7FC] file:text-[#0066D6] hover:file:bg-[#CFFAFE] cursor-pointer">
-                            <p class="text-[11px] font-bold text-[#5A7696] mt-1.5">JPG, PNG, or GIF up to 2MB.</p>
+                            <p class="text-[11px] font-bold text-[#5A7696] mt-1.5">JPG, PNG, GIF, or WEBP up to 5MB.</p>
                         </div>
                     </div>
                 </div>
