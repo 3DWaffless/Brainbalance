@@ -184,7 +184,9 @@ class QuizController extends Controller
             $correctAnswers = $q->correct_answers;
         } elseif ($type === 'multiple_select' || $type === 'fill_blank') {
             $decoded = json_decode((string) $q->correct_answer, true);
-            $correctAnswers = is_array($decoded) ? $decoded : (trim((string) $q->correct_answer) !== '' ? [trim((string) $q->correct_answer)] : []);
+            $correctAnswers = is_array($decoded)
+                ? $decoded
+                : (trim((string) $q->correct_answer) !== '' ? [trim((string) $q->correct_answer)] : []);
         } elseif ($type === 'matching') {
             $correctAnswers = $matchingPairs;
         } else {
@@ -619,35 +621,72 @@ class QuizController extends Controller
         $user = Auth::user();
         abort_unless($this->canManageQuizzes($user), 403);
 
-        $request->validate([
-            'class_id'               => 'required|exists:classes,id',
-            'topic_id'               => 'nullable|integer',
-            'quiz_title'             => 'required|string|max:255',
-            'subject'                => 'required|string|max:255',
-            'max_attempts'           => 'nullable|integer|min:1',
-            'published_at'           => 'nullable|date',
-            'deadline_at'            => 'nullable|date',
-            'save_action'            => 'nullable|string|in:draft,publish',
-            'questions'              => 'required|array|min:1',
-            'questions.*.text'       => 'required|string',
-            'questions.*.type'       => 'nullable|string|in:' . implode(',', self::QUESTION_TYPES),
-            'questions.*.options'    => 'nullable|array',
-            'questions.*.answer'     => 'nullable|string',
-            'questions.*.difficulty' => 'nullable|string|in:easy,medium,hard',
-            'questions.*.time_value' => 'nullable|integer|min:1',
-            'questions.*.time_unit'  => 'nullable|string|in:seconds,minutes,hours',
-        ]);
+        $isAutoSave = $request->boolean('auto_save') || $request->expectsJson() || $request->ajax();
+
+        if ($isAutoSave) {
+            $request->validate([
+                'class_id'               => 'required|exists:classes,id',
+                'topic_id'               => 'nullable|integer',
+                'quiz_title'             => 'nullable|string|max:255',
+                'subject'                => 'nullable|string|max:255',
+                'max_attempts'           => 'nullable|integer|min:1',
+                'published_at'           => 'nullable|date',
+                'deadline_at'            => 'nullable|date',
+                'save_action'            => 'nullable|string|in:draft,publish',
+                'questions'              => 'nullable|array',
+                'questions.*.text'       => 'nullable|string',
+                'questions.*.type'       => 'nullable|string|in:' . implode(',', self::QUESTION_TYPES),
+                'questions.*.options'    => 'nullable|array',
+                'questions.*.answer'     => 'nullable|string',
+                'questions.*.difficulty' => 'nullable|string|in:easy,medium,hard',
+                'questions.*.time_value' => 'nullable|integer|min:1',
+                'questions.*.time_unit'  => 'nullable|string|in:seconds,minutes,hours',
+            ]);
+
+            $rawTitle = trim((string) $request->input('quiz_title', ''));
+            $rawQuestions = (array) $request->input('questions', []);
+            $hasAnyQuestionText = collect($rawQuestions)->contains(fn ($q) => trim((string) ($q['text'] ?? '')) !== '');
+
+            if ($rawTitle === '' && !$hasAnyQuestionText) {
+                return response()->json([
+                    'success' => true,
+                    'skipped' => true,
+                ]);
+            }
+        } else {
+            $request->validate([
+                'class_id'               => 'required|exists:classes,id',
+                'topic_id'               => 'nullable|integer',
+                'quiz_title'             => 'required|string|max:255',
+                'subject'                => 'required|string|max:255',
+                'max_attempts'           => 'nullable|integer|min:1',
+                'published_at'           => 'nullable|date',
+                'deadline_at'            => 'nullable|date',
+                'save_action'            => 'nullable|string|in:draft,publish',
+                'questions'              => 'required|array|min:1',
+                'questions.*.text'       => 'required|string',
+                'questions.*.type'       => 'nullable|string|in:' . implode(',', self::QUESTION_TYPES),
+                'questions.*.options'    => 'nullable|array',
+                'questions.*.answer'     => 'nullable|string',
+                'questions.*.difficulty' => 'nullable|string|in:easy,medium,hard',
+                'questions.*.time_value' => 'nullable|integer|min:1',
+                'questions.*.time_unit'  => 'nullable|string|in:seconds,minutes,hours',
+            ]);
+        }
 
         $hasQuizId = $this->hasQuestionsQuizIdColumn();
         $hasPivot  = $this->hasQuizQuestionsPivotTable();
-        $isPublish = $request->input('save_action', 'publish') === 'publish';
+        $isPublish = !$isAutoSave && $request->input('save_action', 'publish') === 'publish';
 
-        DB::transaction(function () use ($request, $hasQuizId, $hasPivot, $isPublish) {
+        $createdQuiz = DB::transaction(function () use ($request, $hasQuizId, $hasPivot, $isPublish) {
+            $title = trim((string) $request->input('quiz_title', '')) ?: 'Untitled Draft Quiz';
+            $subject = trim((string) $request->input('subject', '')) ?: 'General';
+
             $quizAttributes = [
                 'class_id'     => $request->class_id,
                 'topic_id'     => $request->topic_id ?? null,
-                'title'        => $request->quiz_title,
-                'subject'      => $request->subject,
+                'title'        => $title,
+                'subject'      => $subject,
                 'type'         => $request->quiz_mode ?? 'standard',
                 'config'       => [
                     'is_draft'             => !$isPublish,
@@ -668,7 +707,7 @@ class QuizController extends Controller
             $quiz = Quiz::create($quizAttributes);
 
             $questionIds = [];
-            foreach ($request->questions as $qData) {
+            foreach ((array) $request->input('questions', []) as $qData) {
                 $questionData = $this->buildQuestionAttributes($qData, $request->topic_id ?? null);
 
                 if ($hasQuizId) {
@@ -682,7 +721,19 @@ class QuizController extends Controller
             if ($hasPivot && !empty($questionIds)) {
                 $quiz->questions()->syncWithoutDetaching($questionIds);
             }
+
+            return $quiz;
         });
+
+        if ($isAutoSave) {
+            return response()->json([
+                'success'    => true,
+                'quiz_id'    => $createdQuiz->id,
+                'update_url' => route('quiz.update', $createdQuiz),
+                'status'     => 'draft',
+                'saved_at'   => now()->format('h:i:s A'),
+            ]);
+        }
 
         $redirectRoute = $user->role === 'admin' ? 'admin.quizzes.index' : 'quiz.index';
         $message = $isPublish
@@ -761,6 +812,8 @@ class QuizController extends Controller
             abort_unless($user->ownedClasses->contains($quiz->class_id), 403);
         }
 
+        $isAutoSave = $request->boolean('auto_save') || $request->expectsJson() || $request->ajax();
+
         $request->validate([
             'title'                  => 'nullable|string|max:255',
             'quiz_title'             => 'nullable|string|max:255',
@@ -772,7 +825,7 @@ class QuizController extends Controller
             'save_action'            => 'nullable|string|in:draft,publish',
             'questions'              => 'nullable|array',
             'questions.*.id'         => 'nullable|integer',
-            'questions.*.text'       => 'required_with:questions|string',
+            'questions.*.text'       => $isAutoSave ? 'nullable|string' : 'required_with:questions|string',
             'questions.*.type'       => 'nullable|string|in:' . implode(',', self::QUESTION_TYPES),
             'questions.*.options'    => 'nullable|array',
             'questions.*.answer'     => 'nullable|string',
@@ -783,10 +836,13 @@ class QuizController extends Controller
 
         $hasQuizId = $this->hasQuestionsQuizIdColumn();
         $hasPivot  = $this->hasQuizQuestionsPivotTable();
-        $isPublish = $request->input('save_action', 'publish') === 'publish';
+        $isPublish = !$isAutoSave && $request->input('save_action', 'publish') === 'publish';
 
-        DB::transaction(function () use ($request, $quiz, $hasQuizId, $hasPivot, $isPublish) {
-            $quiz->title = $request->input('quiz_title', $request->input('title', $quiz->title));
+        $keptIds = DB::transaction(function () use ($request, $quiz, $hasQuizId, $hasPivot, $isPublish) {
+            $incomingTitle = trim((string) $request->input('quiz_title', $request->input('title', '')));
+            if ($incomingTitle !== '') {
+                $quiz->title = $incomingTitle;
+            }
             if ($request->filled('class_id')) {
                 $quiz->class_id = $request->class_id;
             }
@@ -822,11 +878,12 @@ class QuizController extends Controller
 
             $quiz->save();
 
-            if ($request->has('questions')) {
-                $keptIds = [];
-                $existingQuestions = Question::whereIn('id', collect($request->questions)->pluck('id')->filter())->get()->keyBy('id');
+            $savedQuestionIds = [];
+            if ($request->has('questions') || $request->boolean('sync_questions')) {
+                $incomingQuestions = (array) $request->input('questions', []);
+                $existingQuestions = Question::whereIn('id', collect($incomingQuestions)->pluck('id')->filter())->get()->keyBy('id');
 
-                foreach ($request->questions as $qData) {
+                foreach ($incomingQuestions as $qData) {
                     $attributes = $this->buildQuestionAttributes($qData, $quiz->topic_id);
 
                     if (!empty($qData['id']) && $existingQuestions->has($qData['id'])) {
@@ -839,16 +896,28 @@ class QuizController extends Controller
                         $question = Question::create($attributes);
                     }
 
-                    $keptIds[] = $question->id;
+                    $savedQuestionIds[] = $question->id;
                 }
 
                 if ($hasPivot) {
-                    $quiz->questions()->sync($keptIds);
+                    $quiz->questions()->sync($savedQuestionIds);
                 } elseif ($hasQuizId) {
-                    Question::where('quiz_id', $quiz->id)->whereNotIn('id', $keptIds)->delete();
+                    Question::where('quiz_id', $quiz->id)->whereNotIn('id', $savedQuestionIds)->delete();
                 }
             }
+
+            return $savedQuestionIds;
         });
+
+        if ($isAutoSave) {
+            return response()->json([
+                'success'      => true,
+                'quiz_id'      => $quiz->id,
+                'status'       => $isPublish ? 'published' : 'draft',
+                'question_ids' => $keptIds,
+                'saved_at'     => now()->format('h:i:s A'),
+            ]);
+        }
 
         $redirectRoute = $user->role === 'admin' ? 'admin.quizzes.index' : 'quiz.index';
         $message = $isPublish

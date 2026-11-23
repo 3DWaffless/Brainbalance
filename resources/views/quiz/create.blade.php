@@ -75,6 +75,45 @@
         color: #C2410C;
     }
 
+    .autosave-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 900;
+        border: 2px solid #BAE6FD;
+        background: #F0F9FF;
+        color: #0369A1;
+        margin-bottom: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .autosave-badge.saving {
+        border-color: #93C5FD;
+        background: #EBF5FF;
+        color: #0066D6;
+    }
+
+    .autosave-badge.saved {
+        border-color: #86EFAC;
+        background: #F0FDF4;
+        color: #15803D;
+    }
+
+    .autosave-badge.dirty {
+        border-color: #FDE047;
+        background: #FEFCE8;
+        color: #854D0E;
+    }
+
+    .autosave-badge.error {
+        border-color: #FECACA;
+        background: #FEF2F2;
+        color: #DC2626;
+    }
+
     .create-quiz-wrapper {
         display: grid;
         grid-template-columns: 1fr 320px;
@@ -569,12 +608,17 @@
         <div class="bb-spectrum-strip"></div>
         <div class="bb-hero-inner">
             <div>
-                <div class="bb-hero-pill {{ $isEditing ? 'draft-pill' : '' }}">
-                    <span>
-                        {{ $isEditing ? '📝 Quiz Editor • Draft Mode' : '✨ Quiz Builder • 7 Question Types' }}
-                    </span>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="bb-hero-pill {{ $isEditing ? 'draft-pill' : '' }}">
+                        <span>
+                            {{ $isEditing ? '📝 Quiz Editor • Draft Mode' : '✨ Quiz Builder • 7 Question Types' }}
+                        </span>
+                    </div>
+                    <div id="autoSaveStatusBadge" class="autosave-badge">
+                        <span id="autoSaveStatusText">🛡️ Auto-draft protection active</span>
+                    </div>
                 </div>
-                <h1 class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">
+                <h1 id="heroQuizHeading" class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">
                     {{ $isEditing ? 'Edit Quiz: ' . ($editingQuiz->title ?? 'Untitled Draft') : 'Create New Quiz 📝' }}
                 </h1>
                 <p class="text-xs sm:text-sm font-extrabold text-[#4A688A] mt-1">
@@ -589,11 +633,15 @@
                     <span>🏦 Question Bank</span>
                     <span class="px-2.5 py-0.5 rounded-full bg-white text-[#D96B00] text-xs font-black">{{ $bankTotalQuestions }}</span>
                 </button>
-                <a href="{{ route('quiz.index') }}" class="btn-back-tactile">
+                <a href="{{ route('quiz.index') }}" id="btnBackToQuizzes" onclick="handleExitToQuizzes(event)" class="btn-back-tactile">
                     &larr; Back to Quizzes
                 </a>
             </div>
         </div>
+    </div>
+
+    <div id="restoredDraftNotice" class="notice-banner" style="display: none;">
+        ✨ Your unsaved quiz edits were automatically restored after refresh and synced as a draft.
     </div>
 
     @if (session('info'))
@@ -645,9 +693,11 @@
                       action="{{ $isEditing ? route('quiz.update', $editingQuiz) : route('quiz.store') }}"
                       method="POST">
                     @csrf
-                    @if($isEditing)
-                        @method('PUT')
-                    @endif
+                    <div id="spoofMethodContainer">
+                        @if($isEditing)
+                            @method('PUT')
+                        @endif
+                    </div>
 
                     <input type="hidden" name="class_id" id="manualClassId" value="{{ $selectedClass->id ?? ($classes->first()->id ?? '') }}">
                     <input type="hidden" name="save_action" id="saveActionInput" value="publish">
@@ -677,6 +727,7 @@
                         <div class="form-group">
                             <label class="form-label">Max Attempts</label>
                             <input type="number"
+                                   id="quizMaxAttemptsInput"
                                    name="max_attempts"
                                    class="form-control"
                                    value="{{ old('max_attempts', $max_attempts ?? ($editingQuiz->max_attempts ?? 1)) }}"
@@ -687,12 +738,12 @@
                     <div class="form-grid-2">
                         <div class="form-group">
                             <label class="form-label">Publish Date</label>
-                            <input type="datetime-local" name="published_at" class="form-control" value="{{ $defaultPublishedAt }}" required>
+                            <input type="datetime-local" id="quizPublishedAtInput" name="published_at" class="form-control" value="{{ $defaultPublishedAt }}" required>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Deadline Date</label>
-                            <input type="datetime-local" name="deadline_at" class="form-control" value="{{ $defaultDeadlineAt }}" required>
+                            <input type="datetime-local" id="quizDeadlineAtInput" name="deadline_at" class="form-control" value="{{ $defaultDeadlineAt }}" required>
                         </div>
                     </div>
 
@@ -755,7 +806,7 @@
                     🏦 <strong>Question Bank:</strong> Click <strong>Question Bank</strong> to search and pull questions from any quiz you already published, separated per quiz.
                 </div>
                 <div class="sidebar-item accent-green">
-                    💾 <strong>Drafts &amp; Publishing:</strong> Save unfinished quizzes as a <strong>Draft</strong> anytime, then edit or publish them from your Quizzes dashboard.
+                    💾 <strong>Auto-Draft Protection:</strong> Your edits stay saved even if you refresh the page, and leaving the editor automatically saves your quiz as a <strong>Draft</strong>.
                 </div>
                 <div class="sidebar-item accent-amber">
                     ⏱️ <strong>Flexible Timers:</strong> Set each question's timer in <strong>Seconds</strong>, <strong>Minutes</strong>, or <strong>Hours</strong> using the unit dropdown.
@@ -954,7 +1005,18 @@
     const PRESELECTED_MODULE_ID = @json(isset($preselectedModule) && $preselectedModule ? $preselectedModule->id : null);
     const INITIAL_QUESTIONS = @json($generatedQuestions ?? []);
     const GENERATE_URL = @json(route('quiz.generate'));
+    const STORE_URL = @json(route('quiz.store'));
     const CSRF_TOKEN = @json(csrf_token());
+
+    const USER_STORAGE_PREFIX = 'bb_quiz_draft_u' + @json(Auth::id() ?? 'guest');
+    let activeQuizId = @json($isEditing ? $editingQuiz->id : null);
+    let activeUpdateUrl = @json($isEditing ? route('quiz.update', $editingQuiz) : null);
+
+    let isExplicitSubmit = false;
+    let isDirty = false;
+    let isAutoSaving = false;
+    let autoSaveDebounceTimer = null;
+    let lastServerSyncMs = 0;
 
     const selectedBankIds = new Set();
     let activeBankFilter = 'all';
@@ -992,16 +1054,362 @@
             .replace(/"/g, '&quot;');
     }
 
+    function getDraftStorageKey(quizId = activeQuizId) {
+        return quizId ? `${USER_STORAGE_PREFIX}_edit_${quizId}` : `${USER_STORAGE_PREFIX}_new`;
+    }
+
+    function setAutoSaveStatus(state, text) {
+        const badge = document.getElementById('autoSaveStatusBadge');
+        const label = document.getElementById('autoSaveStatusText');
+        if (!badge || !label) return;
+        badge.className = 'autosave-badge ' + state;
+        label.textContent = text;
+    }
+
+    /* =========================================================================
+       SERIALIZE / RESTORE / AUTO-SAVE DRAFT STATE
+       ========================================================================= */
+    function serializeQuestionCard(card) {
+        const type = card.dataset.type || 'multiple_choice';
+        const rawId = card.querySelector('.q-id-field')?.value || '';
+        const prompt = card.querySelector('.q-text-field')?.value || '';
+        const difficulty = card.querySelector('.q-diff-field')?.value || 'easy';
+        const points = parseInt(card.querySelector('.q-points-field')?.value, 10) || 100;
+        const timeLimit = parseInt(card.querySelector('.q-time-field')?.value, 10) || 30;
+
+        const base = {
+            id: rawId !== '' ? parseInt(rawId, 10) : null,
+            type,
+            prompt,
+            difficulty,
+            points,
+            time_limit: timeLimit,
+            options: [],
+            correct_answer: '',
+            correct_answers: [],
+            matching_pairs: [],
+        };
+
+        if (type === 'multiple_choice' || type === 'multiple_select') {
+            const rows = Array.from(card.querySelectorAll('.q-opt-row'));
+            const options = [];
+            const correctAnswers = [];
+
+            rows.forEach(row => {
+                const text = row.querySelector('.q-opt-input')?.value ?? '';
+                const checked = row.querySelector('.q-opt-correct')?.checked ?? false;
+                options.push(text);
+                if (checked && text.trim() !== '') {
+                    correctAnswers.push(text.trim());
+                }
+            });
+
+            base.options = options;
+            base.correct_answers = correctAnswers;
+            base.correct_answer = correctAnswers[0] || '';
+        } else if (type === 'true_false') {
+            const checkedRadio = card.querySelector('.q-tf-radio:checked');
+            const val = checkedRadio ? checkedRadio.value : 'True';
+            base.options = ['True', 'False'];
+            base.correct_answer = val;
+            base.correct_answers = [val];
+        } else if (type === 'matching') {
+            base.matching_pairs = Array.from(card.querySelectorAll('.q-pair-row')).map(row => ({
+                left: row.querySelector('.q-pair-left')?.value ?? '',
+                right: row.querySelector('.q-pair-right')?.value ?? '',
+            }));
+        } else if (type === 'fill_blank') {
+            base.correct_answers = Array.from(card.querySelectorAll('.q-blank-field')).map(inp => inp.value ?? '');
+        } else if (type === 'short_answer') {
+            base.correct_answer = card.querySelector('.q-short-field')?.value ?? '';
+        } else if (type === 'essay') {
+            base.correct_answer = card.querySelector('.q-essay-field')?.value ?? '';
+        }
+
+        return base;
+    }
+
+    function captureCurrentDraftSnapshot(syncedAt = 0) {
+        const cards = Array.from(document.querySelectorAll('#questionsContainer .question-card'));
+        return {
+            quizId: activeQuizId,
+            updateUrl: activeUpdateUrl,
+            classId: document.getElementById('manualClassId')?.value || '',
+            quizTitle: document.getElementById('quizTitleInput')?.value || '',
+            subject: document.getElementById('quizSubjectInput')?.value || 'General',
+            maxAttempts: document.getElementById('quizMaxAttemptsInput')?.value || '1',
+            publishedAt: document.getElementById('quizPublishedAtInput')?.value || '',
+            deadlineAt: document.getElementById('quizDeadlineAtInput')?.value || '',
+            questions: cards.map(serializeQuestionCard),
+            updatedAt: Date.now(),
+            syncedAt: syncedAt,
+        };
+    }
+
+    function persistLocalSnapshot(syncedAt = 0) {
+        if (isExplicitSubmit) return;
+        try {
+            const snapshot = captureCurrentDraftSnapshot(syncedAt);
+            localStorage.setItem(getDraftStorageKey(activeQuizId), JSON.stringify(snapshot));
+        } catch (e) {
+            // Ignore storage quota errors
+        }
+    }
+
+    function clearLocalDraft() {
+        try {
+            localStorage.removeItem(getDraftStorageKey(activeQuizId));
+            localStorage.removeItem(`${USER_STORAGE_PREFIX}_new`);
+        } catch (e) {
+            // Ignore storage errors
+        }
+    }
+
+    function switchFormToEditMode(quizId, updateUrl) {
+        if (!quizId || !updateUrl) return;
+        const wasNew = !activeQuizId;
+        activeQuizId = quizId;
+        activeUpdateUrl = updateUrl;
+
+        const form = document.getElementById('manualForm');
+        if (form) {
+            form.action = updateUrl;
+        }
+
+        const spoofContainer = document.getElementById('spoofMethodContainer');
+        if (spoofContainer && !spoofContainer.querySelector('input[name="_method"]')) {
+            spoofContainer.innerHTML = '<input type="hidden" name="_method" value="PUT">';
+        }
+
+        if (wasNew) {
+            try {
+                localStorage.removeItem(`${USER_STORAGE_PREFIX}_new`);
+            } catch (e) {}
+
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', `/quiz/${quizId}/edit`);
+            }
+        }
+    }
+
+    function buildAutoSaveFormData() {
+        reindexAllCards();
+        const form = document.getElementById('manualForm');
+        const formData = new FormData(form);
+
+        formData.set('auto_save', '1');
+        formData.set('save_action', 'draft');
+
+        if (activeUpdateUrl) {
+            formData.set('_method', 'PUT');
+        } else {
+            formData.delete('_method');
+        }
+
+        const maxAttempts = parseInt(formData.get('max_attempts'), 10);
+        if (!maxAttempts || maxAttempts < 1) {
+            formData.set('max_attempts', '1');
+        }
+
+        return formData;
+    }
+
+    function hasMeaningfulDraftContent() {
+        const title = (document.getElementById('quizTitleInput')?.value || '').trim();
+        if (title !== '') return true;
+
+        const texts = Array.from(document.querySelectorAll('#questionsContainer .q-text-field'));
+        return texts.some(t => (t.value || '').trim() !== '');
+    }
+
+    async function saveDraftToServer({ useKeepalive = false, force = false } = {}) {
+        if (isExplicitSubmit) return false;
+        if (!force && !isDirty && !useKeepalive) return false;
+        if (!activeQuizId && !hasMeaningfulDraftContent()) return false;
+
+        if (isAutoSaving && !useKeepalive) {
+            return false;
+        }
+
+        const targetUrl = activeUpdateUrl || STORE_URL;
+        const formData = buildAutoSaveFormData();
+
+        if (useKeepalive) {
+            try {
+                persistLocalSnapshot(0);
+                fetch(targetUrl, {
+                    method: 'POST',
+                    body: formData,
+                    keepalive: true,
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        isAutoSaving = true;
+        setAutoSaveStatus('saving', '⏳ Saving draft...');
+
+        try {
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Auto-save failed');
+            }
+
+            if (data.skipped) {
+                isAutoSaving = false;
+                return false;
+            }
+
+            if (data.quiz_id && data.update_url) {
+                switchFormToEditMode(data.quiz_id, data.update_url);
+            }
+
+            if (Array.isArray(data.question_ids)) {
+                const cards = document.querySelectorAll('#questionsContainer .question-card');
+                data.question_ids.forEach((qId, idx) => {
+                    if (cards[idx]) {
+                        const idInput = cards[idx].querySelector('.q-id-field');
+                        if (idInput) idInput.value = qId;
+                    }
+                });
+                reindexAllCards();
+            }
+
+            isDirty = false;
+            lastServerSyncMs = Date.now();
+            persistLocalSnapshot(lastServerSyncMs);
+            setAutoSaveStatus('saved', `💾 Draft saved • ${data.saved_at || 'just now'}`);
+            return true;
+        } catch (err) {
+            setAutoSaveStatus('error', '⚠️ Offline backup saved locally');
+            return false;
+        } finally {
+            isAutoSaving = false;
+        }
+    }
+
+    function markDraftDirty(immediateSync = false) {
+        if (isExplicitSubmit) return;
+        isDirty = true;
+        persistLocalSnapshot(0);
+        setAutoSaveStatus('dirty', '📝 Unsaved changes...');
+
+        clearTimeout(autoSaveDebounceTimer);
+        if (immediateSync) {
+            saveDraftToServer({ force: true });
+        } else {
+            autoSaveDebounceTimer = setTimeout(() => {
+                saveDraftToServer();
+            }, 1200);
+        }
+    }
+
+    async function handleExitToQuizzes(event) {
+        if (isExplicitSubmit) return;
+        const link = event.currentTarget;
+        const destination = link.href;
+
+        if (isDirty || (!activeQuizId && hasMeaningfulDraftContent())) {
+            event.preventDefault();
+            clearTimeout(autoSaveDebounceTimer);
+            const originalHtml = link.innerHTML;
+            link.innerHTML = '💾 Saving Draft...';
+            link.style.pointerEvents = 'none';
+
+            await saveDraftToServer({ force: true });
+            isExplicitSubmit = true;
+            window.location.href = destination;
+        }
+    }
+
+    function restoreDraftSnapshotIfAvailable() {
+        try {
+            const raw = localStorage.getItem(getDraftStorageKey(activeQuizId));
+            if (!raw) return false;
+
+            const saved = JSON.parse(raw);
+            if (!saved || !Array.isArray(saved.questions) || saved.questions.length === 0) {
+                return false;
+            }
+
+            // Only restore if there were edits saved after the last confirmed server sync
+            // OR if we are on /quiz/create with a previously auto-saved quiz
+            const hasUnsyncedEdits = !saved.syncedAt || saved.updatedAt > saved.syncedAt;
+            if (!hasUnsyncedEdits && activeQuizId) {
+                return false;
+            }
+
+            if (saved.quizId && saved.updateUrl) {
+                switchFormToEditMode(saved.quizId, saved.updateUrl);
+            }
+
+            if (saved.classId) {
+                const classSelect = document.getElementById('classSelector');
+                if (classSelect) classSelect.value = saved.classId;
+                const manualClassInput = document.getElementById('manualClassId');
+                if (manualClassInput) manualClassInput.value = saved.classId;
+            }
+
+            if (typeof saved.quizTitle === 'string') {
+                document.getElementById('quizTitleInput').value = saved.quizTitle;
+            }
+            if (typeof saved.subject === 'string') {
+                document.getElementById('quizSubjectInput').value = saved.subject;
+            }
+            if (saved.maxAttempts) {
+                document.getElementById('quizMaxAttemptsInput').value = saved.maxAttempts;
+            }
+            if (saved.publishedAt) {
+                document.getElementById('quizPublishedAtInput').value = saved.publishedAt;
+            }
+            if (saved.deadlineAt) {
+                document.getElementById('quizDeadlineAtInput').value = saved.deadlineAt;
+            }
+
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+            saved.questions.forEach(q => addQuestionCard(q, true));
+
+            const notice = document.getElementById('restoredDraftNotice');
+            if (notice) notice.style.display = 'block';
+
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function updateSelectedClass(classId) {
         const manualClassInput = document.getElementById('manualClassId');
         if (manualClassInput) manualClassInput.value = classId;
         renderAiClassModules();
+        markDraftDirty(true);
     }
 
     function submitQuizForm(actionType) {
         const form = document.getElementById('manualForm');
         document.getElementById('saveActionInput').value = actionType;
+        reindexAllCards();
+
         if (form.reportValidity()) {
+            isExplicitSubmit = true;
+            clearTimeout(autoSaveDebounceTimer);
+            clearLocalDraft();
             form.submit();
         }
     }
@@ -1031,17 +1439,19 @@
         const unit = unitSelect.value;
         const multiplier = unit === 'hours' ? 3600 : (unit === 'minutes' ? 60 : 1);
         hiddenSec.value = Math.max(5, rawVal * multiplier);
+        markDraftDirty();
     }
 
     /* =========================================================================
        QUESTIONNAIRE BUILDER CARDS
        ========================================================================= */
-    function addQuestionCard(preset = {}) {
+    function addQuestionCard(preset = {}, skipDirty = false) {
         const container = document.getElementById('questionsContainer');
         const type = TYPE_CONFIG[preset.type] ? preset.type : 'multiple_choice';
         const prompt = preset.prompt || preset.question || '';
         const difficulty = preset.difficulty || 'easy';
         const points = preset.points || 100;
+        const questionId = preset.id || '';
         const timeParts = resolveInitialTimeParts(preset.time_limit || preset.time_limit_seconds || 30);
 
         const card = document.createElement('div');
@@ -1049,6 +1459,8 @@
         card.dataset.type = type;
 
         card.innerHTML = `
+            <input type="hidden" class="q-id-field" value="${escapeHtml(questionId)}">
+
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom: 14px;">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="qcard-number px-3 py-1 rounded-full bg-[#EBF5FF] border-2 border-[#93C5FD] font-display font-bold text-xs text-[#0066D6]">Question 1</span>
@@ -1127,6 +1539,10 @@
         container.appendChild(card);
         renderCardDynamicBody(card, type, preset);
         reindexAllCards();
+
+        if (!skipDirty) {
+            markDraftDirty();
+        }
     }
 
     function switchCardType(btn, newType) {
@@ -1141,6 +1557,7 @@
 
         renderCardDynamicBody(card, newType, {});
         reindexAllCards();
+        markDraftDirty(true);
     }
 
     function renderCardDynamicBody(card, type, preset = {}) {
@@ -1285,6 +1702,7 @@
         `;
         list.appendChild(row);
         reindexAllCards();
+        markDraftDirty();
     }
 
     function removeOptRow(btn) {
@@ -1292,6 +1710,7 @@
         if (list.children.length <= 2) return;
         btn.closest('.q-opt-row').remove();
         reindexAllCards();
+        markDraftDirty(true);
     }
 
     function addPairRow(btn) {
@@ -1307,6 +1726,7 @@
         `;
         list.appendChild(row);
         reindexAllCards();
+        markDraftDirty();
     }
 
     function removePairRow(btn) {
@@ -1314,6 +1734,7 @@
         if (list.children.length <= 2) return;
         btn.closest('.q-pair-row').remove();
         reindexAllCards();
+        markDraftDirty(true);
     }
 
     function moveQuestionCard(btn, dir) {
@@ -1325,6 +1746,7 @@
             container.insertBefore(card.nextElementSibling, card);
         }
         reindexAllCards();
+        markDraftDirty(true);
     }
 
     function removeQuestionCard(btn) {
@@ -1335,6 +1757,7 @@
         }
         btn.closest('.question-card').remove();
         reindexAllCards();
+        markDraftDirty(true);
     }
 
     function reindexAllCards() {
@@ -1344,6 +1767,12 @@
         cards.forEach((card, qIdx) => {
             const type = card.dataset.type;
             card.querySelector('.qcard-number').textContent = `Question ${qIdx + 1}`;
+
+            const idField = card.querySelector('.q-id-field');
+            if (idField) {
+                idField.name = `questions[${qIdx}][id]`;
+            }
+
             card.querySelector('.q-type-field').name = `questions[${qIdx}][type]`;
             card.querySelector('.q-text-field').name = `questions[${qIdx}][text]`;
             card.querySelector('.q-diff-field').name = `questions[${qIdx}][difficulty]`;
@@ -1687,12 +2116,14 @@
             if (selectedAiIndices.has(idx)) {
                 addQuestionCard({
                     ...q,
+                    id: null,
                     fromAi: true,
-                });
+                }, true);
             }
         });
 
         closeAiGenerator();
+        markDraftDirty(true);
     }
 
     /* =========================================================================
@@ -1844,6 +2275,7 @@
             quiz.questions.forEach(q => {
                 if (selectedBankIds.has(q.id)) {
                     addQuestionCard({
+                        id: null,
                         type: q.type,
                         prompt: q.prompt,
                         options: q.options,
@@ -1854,23 +2286,63 @@
                         points: q.points,
                         time_limit: q.time_limit,
                         fromQuiz: quiz.title,
-                    });
+                    }, true);
                 }
             });
         });
 
         clearBankSelection();
         closeQuestionBank();
+        markDraftDirty(true);
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        if (Array.isArray(INITIAL_QUESTIONS) && INITIAL_QUESTIONS.length > 0) {
-            INITIAL_QUESTIONS.forEach(q => addQuestionCard(q));
+        const wasRestored = restoreDraftSnapshotIfAvailable();
+
+        if (!wasRestored) {
+            if (Array.isArray(INITIAL_QUESTIONS) && INITIAL_QUESTIONS.length > 0) {
+                INITIAL_QUESTIONS.forEach(q => addQuestionCard(q, true));
+            } else {
+                addQuestionCard({ type: 'multiple_choice' }, true);
+            }
         } else {
-            addQuestionCard({ type: 'multiple_choice' });
+            isDirty = true;
+            saveDraftToServer({ force: true });
         }
 
-        if (PRESELECTED_MODULE_ID) {
+        const manualForm = document.getElementById('manualForm');
+        if (manualForm) {
+            manualForm.addEventListener('input', function(e) {
+                if (e.target.id === 'quizTitleInput' && activeQuizId) {
+                    const heading = document.getElementById('heroQuizHeading');
+                    if (heading) {
+                        heading.textContent = 'Edit Quiz: ' + (e.target.value.trim() || 'Untitled Draft');
+                    }
+                }
+                markDraftDirty(false);
+            });
+
+            manualForm.addEventListener('change', function() {
+                markDraftDirty(true);
+            });
+        }
+
+        // Automatically save as draft when tab is hidden, refreshed, or closed
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden' && !isExplicitSubmit) {
+                clearTimeout(autoSaveDebounceTimer);
+                saveDraftToServer({ useKeepalive: true, force: true });
+            }
+        });
+
+        window.addEventListener('pagehide', function() {
+            if (!isExplicitSubmit) {
+                clearTimeout(autoSaveDebounceTimer);
+                saveDraftToServer({ useKeepalive: true, force: true });
+            }
+        });
+
+        if (PRESELECTED_MODULE_ID && !wasRestored) {
             openAiGenerator();
         }
     });
