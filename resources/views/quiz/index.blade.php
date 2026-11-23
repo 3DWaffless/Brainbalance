@@ -456,7 +456,7 @@
 <!-- 3-COLUMN QUIZ CARDS GRID -->
 @if($quizCollection->isEmpty())
     <div style="background: #FFFFFF; border: 3px dashed #B8E2F8; border-radius: 26px; padding: 48px 24px; text-align: center;">
-        <div style="font-size: 48px; margin-bottom: 10px;">{{ $isStudent ? '🧭' : '📝' }}</div>
+        <div style="font-size: 48px; margin-bottom: 10px;">{{ $isStudent ? '🧭' : '' }}</div>
         <h3 class="font-display" style="font-size: 20px; font-weight: 700; color: #0D2B4E; margin-bottom: 6px;">
             {{ $isStudent ? 'No quiz quests available right now' : 'No quizzes created yet' }}
         </h3>
