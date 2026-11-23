@@ -902,7 +902,7 @@
                             <div style="font-size:11px;font-weight:700;color:#5A7696;">Keep Practicing</div>
                         </div>
 
-                        <div style="background:#FFFFFF;border:3px solid #1DC4DF;border-radius:20px;padding:0.85rem 0.5rem;text-align:center;box-shadow:0 5px 0 #A5F3FC;">
+                        <div style="background:#FFFFFF;border:3px solid #dc0fefa4;border-radius:20px;padding:0.85rem 0.5rem;text-align:center;box-shadow:0 5px 0 #A5F3FC;">
                             <img src="{{ asset('images/3rdplace.png') }}" alt="Great Work Medal" style="width:72px;height:72px;object-fit:contain;margin:0 auto 6px;">
                             <div style="font-size:13px;font-weight:900;color:#0E9EB8;">Great Work!</div>
                             <div style="font-size:11px;font-weight:700;color:#5A7696;">Quest Completed</div>
