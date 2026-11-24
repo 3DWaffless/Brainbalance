@@ -22,9 +22,11 @@
                 <a href="{{ route('quiz.create') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
                     Create Quiz
                 </a>
-                <button type="button" onclick="document.getElementById('create-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2.5 px-4 cursor-pointer">
-                    Create Class
-                </button>
+                {{-- Inside #create-class-modal in resources/views/dashboard.blade.php --}}
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="document.getElementById('create-class-modal')?.classList.add('hidden')" class="btn-tactile-ghost text-xs py-2 px-4 cursor-pointer">Cancel</button>
+                    <button type="submit" class="btn-tactile-primary text-xs py-2 px-5 cursor-pointer">Create Class 🚀</button>
+                </div>
             </div>
         </div>
     @else
