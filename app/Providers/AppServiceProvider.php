@@ -1,10 +1,12 @@
 <?php
+// FILE: app/Providers/AppServiceProvider.php
 
 namespace App\Providers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -16,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         if (config('database.default') === 'sqlite') {
             try {
                 DB::statement('PRAGMA journal_mode=WAL;');

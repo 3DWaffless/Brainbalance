@@ -20,13 +20,21 @@ class SocialiteController extends Controller
 {
     protected function googleDriver()
     {
-        $redirectUrl = config('services.google.redirect');
+        $redirectUrl = (string) config('services.google.redirect');
+
+        if (
+            !app()->environment('local')
+            && (empty($redirectUrl) || str_contains($redirectUrl, '127.0.0.1') || str_contains($redirectUrl, 'localhost'))
+        ) {
+            $redirectUrl = url('/auth/google/callback');
+        }
 
         if (empty($redirectUrl)) {
             $redirectUrl = url('/auth/google/callback');
-            if (!app()->environment('local') && str_starts_with($redirectUrl, 'http://')) {
-                $redirectUrl = 'https://' . substr($redirectUrl, 7);
-            }
+        }
+
+        if (!app()->environment('local') && str_starts_with($redirectUrl, 'http://')) {
+            $redirectUrl = 'https://' . substr($redirectUrl, 7);
         }
 
         $driver = Socialite::driver('google')->redirectUrl($redirectUrl);
