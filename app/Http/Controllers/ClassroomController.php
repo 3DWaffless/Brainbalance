@@ -6,6 +6,8 @@ use App\Models\Classroom;
 use App\Models\Quiz;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class ClassroomController extends Controller
 {
@@ -150,12 +152,103 @@ class ClassroomController extends Controller
         return view('classes.show', compact('classroom'));
     }
 
+    protected function authorizeClassroomOwner(Classroom $classroom): void
+    {
+        $user = auth()->user();
+
+        if (!$user || !in_array($user->role, ['teacher', 'admin'], true) || ($user->role !== 'admin' && (int) $classroom->teacher_id !== (int) $user->id)) {
+            abort(403, 'You are not authorized to modify or delete this classroom.');
+        }
+    }
+
+    protected function generateUniqueClassCode(): string
+    {
+        do {
+            $code = strtoupper(Str::random(6));
+            $exists = Classroom::query()
+                ->when(Schema::hasColumn('classes', 'class_code'), fn ($q) => $q->orWhere('class_code', $code))
+                ->when(Schema::hasColumn('classes', 'code'), fn ($q) => $q->orWhere('code', $code))
+                ->exists();
+        } while ($exists);
+
+        return $code;
+    }
+
+    public function edit(Classroom $classroom)
+    {
+        $this->authorizeClassroomOwner($classroom);
+
+        return view('classes.edit', compact('classroom'));
+    }
+
+    public function update(Request $request, Classroom $classroom)
+    {
+        $this->authorizeClassroomOwner($classroom);
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:150',
+            'subject'     => 'nullable|string|max:100',
+            'grade_level' => 'nullable|string|max:50',
+            'section'     => 'nullable|string|max:100',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $classroom->name = trim($validated['name']);
+
+        if (Schema::hasColumn('classes', 'subject') && filled($validated['subject'] ?? null)) {
+            $classroom->subject = trim($validated['subject']);
+        }
+        if (Schema::hasColumn('classes', 'grade_level')) {
+            $classroom->grade_level = filled($validated['grade_level'] ?? null) ? trim($validated['grade_level']) : null;
+        }
+        if (Schema::hasColumn('classes', 'section')) {
+            $classroom->section = filled($validated['section'] ?? null) ? trim($validated['section']) : null;
+        }
+        if (Schema::hasColumn('classes', 'description')) {
+            $classroom->description = filled($validated['description'] ?? null) ? trim($validated['description']) : null;
+        }
+
+        $classroom->save();
+
+        return redirect()
+            ->route('subjects.show', $classroom->id)
+            ->with('success', 'Classroom details updated successfully!');
+    }
+
+    public function regenerateCode(Classroom $classroom)
+    {
+        $this->authorizeClassroomOwner($classroom);
+
+        $newCode = $this->generateUniqueClassCode();
+
+        if (Schema::hasColumn('classes', 'class_code')) {
+            $classroom->class_code = $newCode;
+        }
+        if (Schema::hasColumn('classes', 'code')) {
+            $classroom->code = $newCode;
+        }
+
+        $classroom->save();
+
+        return redirect()
+            ->route('subjects.show', $classroom->id)
+            ->with('success', "New classroom join code generated: {$newCode}");
+    }
+
     public function destroy(Classroom $classroom)
     {
-        abort_unless(Auth::user()->isTeacher() && $classroom->teacher_id === Auth::id(), 403);
+        $this->authorizeClassroomOwner($classroom);
+
+        $classroomName = $classroom->name;
+
+        if (method_exists($classroom, 'students')) {
+            $classroom->students()->detach();
+        }
 
         $classroom->delete();
 
-        return redirect()->route('dashboard')->with('success', 'Classroom deleted successfully!');
+        return redirect()
+            ->route('subjects.index')
+            ->with('success', "Classroom \"{$classroomName}\" has been deleted.");
     }
 }

@@ -232,6 +232,10 @@
                             <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             Quizzes
                         </a>
+                        <a href="{{ route('teacher.student-logs.index') }}" class="bb-sidebar-link {{ request()->routeIs('teacher.student-logs.*') ? 'bb-nav-active-purple' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+                            Student Logs
+                        </a>
                     @elseif($isStudent)
                         <a href="{{ route('dashboard') }}" class="bb-sidebar-link {{ request()->routeIs('dashboard') ? 'bb-nav-active-blue' : '' }}">
                             <span class="text-lg">🏫</span>
@@ -272,6 +276,10 @@
                         <a href="{{ route('quiz.index') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.*') ? 'bb-nav-active-orange' : '' }}">
                             <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             Quizzes
+                        </a>
+                        <a href="{{ route('teacher.student-logs.index') }}" class="bb-sidebar-link {{ request()->routeIs('teacher.student-logs.*') ? 'bb-nav-active-purple' : '' }}">
+                            <svg class="w-5 h-5 stroke-current shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+                            Student Logs
                         </a>
                     @endif
 

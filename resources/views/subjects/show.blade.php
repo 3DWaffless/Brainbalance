@@ -75,10 +75,14 @@
 
 <!-- Header Navigation & Code Display -->
 <div class="mb-6">
-    <a href="{{ Auth::user()->role === 'admin' ? route('admin.subjects.index') : route('subjects.index') }}"
-       class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white border-2 border-brand-border text-brand-coral font-black text-xs mb-3 hover:-translate-x-1 transition-transform shadow-2xs">
-        &larr; Back to Subjects
-    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <a href="{{ Auth::user()->role === 'admin' ? route('admin.subjects.index') : route('subjects.index') }}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white border-2 border-brand-border text-brand-coral font-black text-xs hover:-translate-x-1 transition-transform shadow-2xs">
+            &larr; Back to Subjects
+        </a>
+
+        @include('components.classroom-manage-modal', ['classroom' => $classroom])
+    </div>
 
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 rounded-3xl border-4 border-brand-border shadow-tactile-ghost"
          style="background: {{ $heroGradient }};">
@@ -93,6 +97,11 @@
                 <h1 class="font-display text-2xl md:text-3xl font-bold text-brand-text leading-tight">
                     {{ $classroom->name }}
                 </h1>
+                @if(!empty($classroom->description))
+                    <p class="text-xs sm:text-sm font-bold text-slate-600 mt-1 max-w-2xl">
+                        {{ $classroom->description }}
+                    </p>
+                @endif
                 @if($classroom->teacher)
                     <p class="text-xs font-extrabold text-slate-500 mt-1">
                         🧑‍🏫 Teacher: <span class="text-brand-text">{{ $classroom->teacher->first_name }} {{ $classroom->teacher->last_name }}</span>
@@ -218,7 +227,7 @@
                             <div>
                                 <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Upload Video File (MP4, WebM, MOV &bull; Max 50MB)</label>
                                 <input type="file" name="video_file" id="field-video-file" accept="video/*"
-                                       class="w-full p-2 rounded-xl border-2 border-dashed border-[#93C5FD] bg-white text-xs font-bold text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#ECFEFF] file:text-[#0E7490] cursor-pointer">
+                                       class="w-full p-2 rounded-xl border-2 border-dashed border-[#93C5FD] bg-white text-xs font-bold text-slate-600 file:mr-2 file:py-1.5 file:px-3 rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#ECFEFF] file:text-[#0E7490] cursor-pointer">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Or Paste YouTube / Video Link</label>

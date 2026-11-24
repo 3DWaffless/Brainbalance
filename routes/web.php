@@ -9,6 +9,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\StudentLogController;
 use App\Models\StudentBadge;
 
 Route::get('/', function () {
@@ -59,12 +60,19 @@ Route::middleware('auth')->group(function () {
 
     // Classroom Routes
     Route::get('/dashboard', [ClassroomController::class, 'dashboard'])->name('dashboard');
-    Route::get('/classes/{classroom}', [ClassroomController::class, 'show'])->name('classes.show');
     Route::post('/classes', [ClassroomController::class, 'store'])->name('classes.store');
+    Route::post('/classes/join', [ClassroomController::class, 'join'])->name('classes.join');
+    Route::get('/classes/{classroom}/edit', [ClassroomController::class, 'edit'])->name('classes.edit');
+    Route::put('/classes/{classroom}', [ClassroomController::class, 'update'])->name('classes.update');
+    Route::post('/classes/{classroom}/regenerate-code', [ClassroomController::class, 'regenerateCode'])->name('classes.regenerate-code');
+    Route::get('/classes/{classroom}', [ClassroomController::class, 'show'])->name('classes.show');
     Route::delete('/classes/{classroom}', [ClassroomController::class, 'destroy'])->name('classes.destroy');
     Route::delete('/classes/{classroom}/students/{student}', [ClassroomController::class, 'removeStudent'])->name('classes.removeStudent');
-    Route::post('/classes/join', [ClassroomController::class, 'join'])->name('classes.join');
     Route::delete('/classes/{classroom}/leave', [ClassroomController::class, 'leave'])->name('classes.leave');
+
+    // Teacher Student Activity Logs Routes
+    Route::get('/teacher/student-logs', [StudentLogController::class, 'index'])->name('teacher.student-logs.index');
+    Route::get('/teacher/student-logs/export', [StudentLogController::class, 'export'])->name('teacher.student-logs.export');
 
     // Quiz Routes
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz.index');
