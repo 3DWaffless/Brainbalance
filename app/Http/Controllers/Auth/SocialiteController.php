@@ -1,4 +1,5 @@
 <?php
+// FILE: app/Http/Controllers/Auth/SocialiteController.php
 
 namespace App\Http\Controllers\Auth;
 
@@ -19,7 +20,16 @@ class SocialiteController extends Controller
 {
     protected function googleDriver()
     {
-        $driver = Socialite::driver('google');
+        $redirectUrl = config('services.google.redirect');
+
+        if (empty($redirectUrl)) {
+            $redirectUrl = url('/auth/google/callback');
+            if (!app()->environment('local') && str_starts_with($redirectUrl, 'http://')) {
+                $redirectUrl = 'https://' . substr($redirectUrl, 7);
+            }
+        }
+
+        $driver = Socialite::driver('google')->redirectUrl($redirectUrl);
 
         if (app()->environment('local')) {
             $driver->setHttpClient(new Client(['verify' => false]));

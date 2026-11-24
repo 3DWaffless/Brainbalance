@@ -1,4 +1,5 @@
 <?php
+// FILE: config/services.php
 
 return [
 
@@ -34,6 +35,7 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
     ],
@@ -42,10 +44,10 @@ return [
         'key'   => env('GROQ_API_KEY'),
         'model' => env('GROQ_MODEL', 'llama-3.1-70b-versatile'),
     ],
-    
+
     'google' => [
         'client_id'     => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect'      => env('GOOGLE_REDIRECT_URL'),
+        'redirect'      => env('GOOGLE_REDIRECT_URL') ?: env('GOOGLE_REDIRECT_URI'),
     ],
 ];
