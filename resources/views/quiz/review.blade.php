@@ -219,6 +219,23 @@
     </div>
 </div>
 
+<!-- Bottom Navigation Bar -->
+<div class="card-tactile flex flex-col sm:flex-row justify-between items-center gap-4">
+    <a href="{{ route('quiz.history') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
+        &larr; Back to Quiz History
+    </a>
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a href="{{ route('quiz.index') }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
+            📋 All Quizzes
+        </a>
+        <button type="button"
+                onclick="window.scrollTo({ top: 0, behavior: 'smooth' })"
+                class="btn-tactile-primary text-xs py-2.5 px-4">
+            &uarr; Back to Top
+        </button>
+    </div>
+</div>
+
 <script>
     function speakReviewText(text) {
         if (!('speechSynthesis' in window)) return;

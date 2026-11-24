@@ -122,16 +122,18 @@
                     $startPage = max(1, $currentPage - 1);
                     $endPage = min($lastPage, $currentPage + 1);
                 @endphp
-                <div class="mt-6 pt-4 border-t-4 border-dashed border-brand-border flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="mt-6 pt-3 flex flex-col sm:flex-row justify-between items-center gap-4"
+                     style="border-top: 3px dashed #CBD5E1;">
                     <div class="text-xs font-extrabold text-slate-500">
                         Showing <span class="font-black text-brand-text">{{ $attempts->firstItem() }}</span>
                         to <span class="font-black text-brand-text">{{ $attempts->lastItem() }}</span>
-                        of <span class="font-black text-brand-text">{{ $attempts->total() }}</span> attempts
+                        of <span class="font-black text-brand-text">{{ $attempts->total() }}</span> results
                     </div>
 
-                    <div class="flex flex-wrap items-center justify-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2.5">
                         @if ($attempts->onFirstPage())
-                            <span class="px-4 py-2.5 rounded-2xl bg-white border-2 border-brand-border text-xs font-black text-slate-400 opacity-60 cursor-not-allowed select-none">
+                            <span class="btn-tactile-ghost text-xs py-2.5 px-4"
+                                  style="opacity: 0.5; cursor: not-allowed; pointer-events: none;">
                                 &larr; Previous
                             </span>
                         @else
@@ -143,13 +145,13 @@
                         @if ($startPage > 1)
                             <a href="{{ $attempts->url(1) }}" class="btn-tactile-ghost text-xs py-2.5 px-4">1</a>
                             @if ($startPage > 2)
-                                <span class="px-2 text-xs font-black text-slate-400">...</span>
+                                <span class="text-xs font-black text-slate-500">...</span>
                             @endif
                         @endif
 
                         @for ($page = $startPage; $page <= $endPage; $page++)
                             @if ($page === $currentPage)
-                                <span class="btn-tactile-teal text-xs py-2.5 px-4 pointer-events-none">
+                                <span class="btn-tactile-primary text-xs py-2.5 px-4" style="pointer-events: none;">
                                     {{ $page }}
                                 </span>
                             @else
@@ -161,7 +163,7 @@
 
                         @if ($endPage < $lastPage)
                             @if ($endPage < $lastPage - 1)
-                                <span class="px-2 text-xs font-black text-slate-400">...</span>
+                                <span class="text-xs font-black text-slate-500">...</span>
                             @endif
                             <a href="{{ $attempts->url($lastPage) }}" class="btn-tactile-ghost text-xs py-2.5 px-4">{{ $lastPage }}</a>
                         @endif
@@ -171,7 +173,8 @@
                                 Next &rarr;
                             </a>
                         @else
-                            <span class="px-4 py-2.5 rounded-2xl bg-white border-2 border-brand-border text-xs font-black text-slate-400 opacity-60 cursor-not-allowed select-none">
+                            <span class="btn-tactile-ghost text-xs py-2.5 px-4"
+                                  style="opacity: 0.5; cursor: not-allowed; pointer-events: none;">
                                 Next &rarr;
                             </span>
                         @endif
