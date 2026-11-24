@@ -5,6 +5,8 @@
 
 @section('content')
 @php
+    $isTeacherOrAdmin = Auth::user()->isTeacher() || Auth::user()->role === 'admin';
+
     $studentClassBadges = Auth::user()->isStudent()
         ? \App\Models\StudentBadge::with(['badge', 'quiz'])
             ->where('student_id', Auth::id())
@@ -25,11 +27,27 @@
             ? 'linear-gradient(135deg, #DCFCE7 0%, #FFFFFF 60%, #FEF9C3 100%)'
             : 'linear-gradient(135deg, #FEF3C7 0%, #FFFFFF 60%, #EEF6FF 100%)');
 
+    // Module sections created for this classroom (with separated teacher notes per module)
+    $moduleSections = \Illuminate\Support\Facades\Schema::hasTable('module_sections')
+        ? \App\Models\ModuleSection::where('class_id', $classroom->id)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get()
+        : collect();
+
     // Legacy modules not yet linked to a unified stream post
     $linkedModuleIds = $classroom->announcements->pluck('module_id')->filter()->all();
     $legacyModules = isset($classroom->modules)
         ? $classroom->modules->whereNotIn('id', $linkedModuleIds)
         : collect();
+
+    // Separate unassigned stream posts & files from those organized inside a Module Section
+    $generalAnnouncements = $classroom->announcements
+        ->filter(fn ($p) => empty($p->module_section_id))
+        ->sortByDesc('created_at');
+
+    $generalLegacyModules = $legacyModules
+        ->filter(fn ($m) => empty($m->module_section_id));
 @endphp
 
 <!-- NEW BADGE UNLOCKED NOTIFICATION BANNER -->
@@ -127,22 +145,35 @@
 <!-- Main 2-Column Responsive Workspace Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-    <!-- Left Main Column (8 Cols on Desktop): UNIFIED CLASS STREAM & COMPOSER -->
+    <!-- Left Main Column (8 Cols on Desktop): MODULE SECTIONS & UNIFIED CLASS STREAM -->
     <div class="lg:col-span-8 flex flex-col gap-6">
 
         <div class="card-tactile">
             <div class="flex flex-wrap justify-between items-center gap-2 mb-5 pb-3 border-b-4 border-dashed border-brand-border">
                 <h3 class="font-display text-lg font-bold text-brand-text flex items-center gap-2">
-                    <span>📣 Class Stream &amp; Materials</span>
+                    <span>📣 Class Stream, Modules &amp; Materials</span>
                 </h3>
-                <span class="px-3 py-1 bg-sky-100 border border-sky-200 text-brand-coral font-black text-xs rounded-full">
-                    {{ $classroom->announcements->count() + $legacyModules->count() }} Posts
-                </span>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if($isTeacherOrAdmin)
+                        <button type="button" onclick="openCreateModuleModal()" class="btn-tactile-teal text-xs py-1.5 px-3.5 cursor-pointer">
+                            📚 Create Module Section
+                        </button>
+                    @endif
+                    <span class="px-3 py-1 bg-sky-100 border border-sky-200 text-brand-coral font-black text-xs rounded-full">
+                        {{ $moduleSections->count() }} Modules &bull; {{ $classroom->announcements->count() + $legacyModules->count() }} Posts
+                    </span>
+                </div>
             </div>
 
-            @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
+            @if(session('success'))
+                <div class="mb-4 p-3 rounded-2xl bg-lime-50 border-2 border-lime-300 text-lime-800 text-xs font-black">
+                    ✅ {{ session('success') }}
+                </div>
+            @endif
+
+            @if($isTeacherOrAdmin)
                 <!-- UNIFIED QUIZ-MAKER STYLE COMPOSER -->
-                <form action="{{ route('announcements.store', $classroom->id) }}" method="POST" enctype="multipart/form-data"
+                <form id="classPostComposerForm" action="{{ route('announcements.store', $classroom->id) }}" method="POST" enctype="multipart/form-data"
                       class="mb-6 bg-[#F2FAFF] p-4 sm:p-5 rounded-3xl border-3 border-[#B8E2F8] shadow-[0_5px_0_#D4F1FC]">
                     @csrf
                     <input type="hidden" name="type" id="postTypeInput" value="{{ old('type', 'text') }}">
@@ -151,9 +182,14 @@
                         <span class="text-xs font-black uppercase tracking-wider text-[#0066D6]">
                             ✨ Choose What to Post to Your Class
                         </span>
-                        <a href="{{ route('quiz.create', ['class_id' => $classroom->id]) }}" class="text-xs font-black text-[#D96B00] hover:underline">
-                            ➕ Build a New Quiz First &rarr;
-                        </a>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="openCreateModuleModal()" class="text-xs font-black text-[#0E7490] hover:underline cursor-pointer">
+                                📚 + New Module Section
+                            </button>
+                            <a href="{{ route('quiz.create', ['class_id' => $classroom->id]) }}" class="text-xs font-black text-[#D96B00] hover:underline">
+                                ➕ Build Quiz &rarr;
+                            </a>
+                        </div>
                     </div>
 
                     <!-- Type Selector Pills -->
@@ -186,7 +222,23 @@
                         </div>
                     @endif
 
-                    <!-- Dynamic Title Field (Shown for File, Video, Assignment, optional for Text/Quiz) -->
+                    <!-- Target Module Section Picker -->
+                    <div class="mb-3">
+                        <label class="block text-[11px] font-black text-[#0E7490] uppercase mb-1">
+                            📚 Module Section (Separate your notes &amp; files per module)
+                        </label>
+                        <select name="module_section_id" id="field-module-section"
+                                class="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#99E2F5] bg-white font-extrabold text-sm text-brand-text focus:outline-none focus:border-[#0066D6]">
+                            <option value="">General Class Stream (Not inside a specific module)</option>
+                            @foreach($moduleSections as $idx => $sec)
+                                <option value="{{ $sec->id }}" @selected((string) old('module_section_id') === (string) $sec->id)>
+                                    Module {{ $idx + 1 }}: {{ $sec->title }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Title Field -->
                     <div id="field-title-wrap" class="mb-3">
                         <label id="field-title-label" class="block text-[11px] font-black text-slate-500 uppercase mb-1">Title (Optional)</label>
                         <input type="text" name="title" id="field-title" value="{{ old('title') }}"
@@ -194,7 +246,7 @@
                                class="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#B8E2F8] bg-white font-extrabold text-sm text-brand-text focus:outline-none focus:border-[#0066D6]">
                     </div>
 
-                    <!-- Quiz Picker (Shown when type == quiz) -->
+                    <!-- Quiz Picker -->
                     <div id="field-quiz-wrap" class="mb-3 hidden">
                         <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Select Class Quiz to Post</label>
                         @if(isset($classroom->quizzes) && $classroom->quizzes->count() > 0)
@@ -214,14 +266,14 @@
                         @endif
                     </div>
 
-                    <!-- File Upload Box (Shown for File and optional for Assignment) -->
+                    <!-- File Upload Box -->
                     <div id="field-file-wrap" class="mb-3 hidden">
                         <label id="field-file-label" class="block text-[11px] font-black text-slate-500 uppercase mb-1">Attach File (PDF, Doc, Photo, Audio)</label>
                         <input type="file" name="file" id="field-file"
                                class="w-full p-2 rounded-xl border-2 border-dashed border-[#93C5FD] bg-white text-xs font-bold text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#EBF5FF] file:text-[#0066D6] hover:file:bg-[#DBEAFE] cursor-pointer">
                     </div>
 
-                    <!-- Video Upload or URL (Shown when type == video) -->
+                    <!-- Video Upload or URL -->
                     <div id="field-video-wrap" class="mb-3 hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
@@ -238,7 +290,7 @@
                         </div>
                     </div>
 
-                    <!-- Assignment Due Date & Points (Shown when type == assignment) -->
+                    <!-- Assignment Due Date & Points -->
                     <div id="field-assignment-wrap" class="mb-3 hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
@@ -254,26 +306,242 @@
                         </div>
                     </div>
 
-                    <!-- Message / Instructions Textarea -->
+                    <!-- Message / Notes Textarea -->
                     <div class="mb-3">
                         <label id="field-content-label" class="block text-[11px] font-black text-slate-500 uppercase mb-1">Announcement Message *</label>
                         <textarea name="content" id="field-content" rows="3"
-                                  placeholder="Post a friendly update for your students..."
+                                  placeholder="Post a friendly update or module note for your students..."
                                   class="w-full p-3.5 rounded-xl border-2 border-[#B8E2F8] bg-white font-extrabold text-sm text-brand-text focus:outline-none focus:border-[#0066D6] resize-none">{{ old('content') }}</textarea>
                     </div>
 
                     <div class="flex justify-end">
-                        <button type="submit" id="composerSubmitBtn" class="btn-tactile-primary">
+                        <button type="submit" id="composerSubmitBtn" class="btn-tactile-primary cursor-pointer">
                             📣 Post Announcement
                         </button>
                     </div>
                 </form>
             @endif
 
-            <!-- Stream Type Filter Pills -->
+            <!-- ========================================================= -->
+            <!-- MODULE SECTIONS (SEPARATED NOTES & FILES PER MODULE)      -->
+            <!-- ========================================================= -->
+            @if($moduleSections->count() > 0)
+                <div class="mb-7 space-y-5">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-display font-bold text-base text-brand-text flex items-center gap-2">
+                            <span>📚 Learning Modules &amp; Teacher Notes</span>
+                        </h4>
+                    </div>
+
+                    @foreach($moduleSections as $secIdx => $section)
+                        @php
+                            $sectionPosts = $classroom->announcements
+                                ->filter(fn ($p) => (int) ($p->module_section_id ?? 0) === (int) $section->id)
+                                ->sortBy('created_at');
+
+                            $sectionLegacyModules = $legacyModules
+                                ->filter(fn ($m) => (int) ($m->module_section_id ?? 0) === (int) $section->id);
+
+                            $itemCount = $sectionPosts->count() + $sectionLegacyModules->count();
+                        @endphp
+
+                        <div class="rounded-3xl border-3 border-[#99E2F5] bg-gradient-to-b from-[#F0F9FF] to-white p-4 sm:p-5 shadow-[0_6px_0_#D4F1FC]">
+                            <!-- Module Section Header -->
+                            <div class="flex flex-wrap items-start justify-between gap-3 pb-3 mb-3 border-b-2 border-dashed border-[#B8E2F8]">
+                                <div>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0066D6] text-white font-black text-[10px] uppercase tracking-wider mb-1">
+                                        Module {{ $secIdx + 1 }} &bull; {{ $itemCount }} {{ \Illuminate\Support\Str::plural('Item', $itemCount) }}
+                                    </span>
+                                    <h5 class="font-display font-bold text-lg text-brand-text">
+                                        {{ $section->title }}
+                                    </h5>
+                                </div>
+
+                                @if($isTeacherOrAdmin)
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <button type="button"
+                                                onclick="preparePostInModule({{ $section->id }}, 'file')"
+                                                class="px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 border-2 border-[#B8E2F8] text-[#0066D6] font-black text-xs cursor-pointer">
+                                            📄 + Add File
+                                        </button>
+                                        <button type="button"
+                                                onclick="document.getElementById('edit-module-notes-{{ $section->id }}')?.classList.toggle('hidden')"
+                                                class="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 border-2 border-amber-200 text-amber-800 font-black text-xs cursor-pointer">
+                                            ✏️ Edit Notes
+                                        </button>
+                                        <form action="{{ route('module-sections.destroy', $section->id) }}" method="POST" onsubmit="return confirm('Delete this module section? Files and posts inside will stay in the General Stream.');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 border-2 border-rose-200 text-rose-600 font-black text-xs cursor-pointer" title="Delete Module Section">
+                                                🗑️
+                                            </button>
+                                        </form>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Separated Teacher Notes for This Module -->
+                            @if(!empty($section->notes))
+                                <div class="mb-4 p-3.5 sm:p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-200">
+                                    <div class="text-[11px] font-black uppercase tracking-wider text-amber-800 mb-1 flex items-center gap-1.5">
+                                        <span>📝 Teacher Notes for {{ $section->title }}</span>
+                                    </div>
+                                    <p class="font-bold text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">{{ $section->notes }}</p>
+                                </div>
+                            @elseif($isTeacherOrAdmin)
+                                <div class="mb-3 text-xs font-bold text-slate-400 italic">
+                                    No module notes added yet — click "Edit Notes" to write notes for this module.
+                                </div>
+                            @endif
+
+                            <!-- Inline Edit Module Title & Notes Form (Teacher Only) -->
+                            @if($isTeacherOrAdmin)
+                                <form id="edit-module-notes-{{ $section->id }}" action="{{ route('module-sections.update', $section->id) }}" method="POST"
+                                      class="hidden mb-4 p-3.5 rounded-2xl bg-white border-2 border-[#99E2F5] space-y-2.5">
+                                    @csrf
+                                    @method('PUT')
+                                    <div>
+                                        <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Module Title</label>
+                                        <input type="text" name="title" value="{{ $section->title }}" required
+                                               class="w-full px-3 py-2 rounded-xl border-2 border-[#B8E2F8] font-extrabold text-xs sm:text-sm text-brand-text">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black uppercase text-amber-800 mb-1">Module Notes / Lesson Guide</label>
+                                        <textarea name="notes" rows="3" placeholder="Write lesson notes, objectives, or reminders specific to this module..."
+                                                  class="w-full p-3 rounded-xl border-2 border-amber-200 bg-amber-50/40 font-bold text-xs sm:text-sm text-brand-text">{{ $section->notes }}</textarea>
+                                    </div>
+                                    <div class="flex justify-end gap-2">
+                                        <button type="button" onclick="document.getElementById('edit-module-notes-{{ $section->id }}')?.classList.add('hidden')" class="btn-tactile-ghost text-xs py-1.5 px-3 cursor-pointer">
+                                            Cancel
+                                        </button>
+                                        <button type="submit" class="btn-tactile-primary text-xs py-1.5 px-4 cursor-pointer">
+                                            Save Module Notes
+                                        </button>
+                                    </div>
+                                </form>
+                            @endif
+
+                            <!-- Files & Posts Inside This Module -->
+                            @if($itemCount > 0)
+                                <div class="space-y-3">
+                                    @foreach($sectionPosts as $post)
+                                        @php
+                                            $postType = $post->type ?? 'text';
+                                            $ext = strtolower($post->file_type ?? pathinfo((string) $post->file_name, PATHINFO_EXTENSION));
+                                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
+                                            $isAudio = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
+                                            $isPdf   = $ext === 'pdf';
+                                        @endphp
+                                        <div class="bg-white border-2 border-[#B8E2F8] rounded-2xl p-3.5">
+                                            <div class="flex items-start justify-between gap-2 mb-1.5">
+                                                <div>
+                                                    <span class="px-2 py-0.5 rounded-full bg-sky-100 text-[#0066D6] font-black text-[10px] uppercase">
+                                                        {{ $postType === 'file' ? '📄 File' : ($postType === 'video' ? '🎬 Video' : ($postType === 'quiz' ? '🧩 Quiz' : ($postType === 'assignment' ? '📝 Assignment' : '📌 Module Note'))) }}
+                                                    </span>
+                                                    @if($post->title)
+                                                        <h6 class="font-black text-sm text-brand-text mt-1">{{ $post->title }}</h6>
+                                                    @endif
+                                                </div>
+
+                                                @if($isTeacherOrAdmin)
+                                                    <form action="{{ route('announcements.destroy', $post->id) }}" method="POST" onsubmit="return confirm('Delete this item from the module?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="text-[11px] font-black text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg cursor-pointer">🗑️</button>
+                                                    </form>
+                                                @endif
+                                            </div>
+
+                                            @if(!empty($post->content))
+                                                <p class="font-bold text-xs sm:text-sm text-slate-600 whitespace-pre-line mb-2.5">{{ $post->content }}</p>
+                                            @endif
+
+                                            @if($post->file_path)
+                                                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                                                    <span class="text-xs font-extrabold text-slate-500 truncate">
+                                                        📎 {{ $post->file_name }}
+                                                    </span>
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        @if($isImage)
+                                                            <button type="button" onclick="openMediaModal('image', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
+                                                                🖼️ View
+                                                            </button>
+                                                        @elseif($isAudio)
+                                                            <button type="button" onclick="openMediaModal('audio', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
+                                                                🎧 Listen
+                                                            </button>
+                                                        @elseif($isPdf && $post->module_id)
+                                                            <a href="{{ route('modules.read', $post->module_id) }}" class="btn-tactile-teal text-xs py-1 px-3">
+                                                                📕 Read Lesson
+                                                            </a>
+                                                        @endif
+                                                        <a href="{{ route('announcements.download', $post->id) }}" class="btn-tactile-ghost text-xs py-1 px-3">
+                                                            ⬇️ Download
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            @elseif($postType === 'quiz' && $post->quiz)
+                                                <div class="pt-1 flex justify-end">
+                                                    <a href="{{ route('quiz.show', $post->quiz->id) }}" class="btn-tactile-teal text-xs py-1.5 px-3.5">
+                                                        {{ Auth::user()->isStudent() ? '🚀 Play Quiz Quest' : 'View Quiz →' }}
+                                                    </a>
+                                                </div>
+                                            @elseif($postType === 'assignment')
+                                                <div class="pt-1 flex justify-between items-center">
+                                                    <span class="text-xs font-extrabold text-amber-700">
+                                                        @if($post->due_at) Due {{ $post->due_at->format('M d, Y • h:i A') }} @endif
+                                                    </span>
+                                                    @if(Auth::user()->isStudent())
+                                                        <a href="{{ route('assignments.index') }}" class="btn-tactile-primary text-xs py-1.5 px-3.5">📤 Turn In</a>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+
+                                    @foreach($sectionLegacyModules as $module)
+                                        @php
+                                            $ext = strtolower($module->file_type ?? pathinfo($module->file_name, PATHINFO_EXTENSION));
+                                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
+                                            $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv']);
+                                            $isAudio = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
+                                            $isPdf   = $ext === 'pdf';
+                                        @endphp
+                                        <div class="bg-white border-2 border-[#B8E2F8] rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                            <div>
+                                                <div class="font-black text-sm text-brand-text">{{ $module->title }}</div>
+                                                @if(!empty($module->description))
+                                                    <p class="text-xs font-bold text-slate-600 mt-0.5">{{ $module->description }}</p>
+                                                @endif
+                                                <span class="text-[11px] font-bold text-slate-400">{{ strtoupper($ext ?: 'FILE') }} &bull; {{ $module->formatted_size }}</span>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                @if($isImage)
+                                                    <button type="button" onclick="openMediaModal('image', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">🖼️ View</button>
+                                                @elseif($isVideo)
+                                                    <button type="button" onclick="openMediaModal('video', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">🎬 Watch</button>
+                                                @elseif($isAudio)
+                                                    <button type="button" onclick="openMediaModal('audio', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">🎧 Listen</button>
+                                                @elseif($isPdf)
+                                                    <a href="{{ route('modules.read', $module->id) }}" class="btn-tactile-teal text-xs py-1 px-3">📕 Read</a>
+                                                @endif
+                                                <a href="{{ route('modules.download', $module->id) }}" class="btn-tactile-ghost text-xs py-1 px-3">⬇️ Download</a>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-xs font-bold text-slate-400">No files or activities attached to this module yet.</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            <!-- Stream Type Filter Pills (For General Stream) -->
             <div class="flex flex-wrap items-center gap-2 mb-5">
                 <button type="button" onclick="filterStream('all', this)" class="stream-filter-btn px-3 py-1.5 rounded-full bg-[#0066D6] text-white font-black text-xs cursor-pointer">
-                    All Posts
+                    All General Posts
                 </button>
                 <button type="button" onclick="filterStream('text', this)" class="stream-filter-btn px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-black text-xs hover:bg-sky-50 cursor-pointer">
                     💬 Announcements
@@ -292,10 +560,10 @@
                 </button>
             </div>
 
-            <!-- UNIFIED CLASS STREAM FEED -->
-            @if($classroom->announcements->count() > 0 || $legacyModules->count() > 0)
+            <!-- GENERAL CLASS STREAM FEED -->
+            @if($generalAnnouncements->count() > 0 || $generalLegacyModules->count() > 0)
                 <div class="flex flex-col gap-4" id="unifiedStreamFeed">
-                    @foreach($classroom->announcements->sortByDesc('created_at') as $post)
+                    @foreach($generalAnnouncements as $post)
                         @php
                             $postType = $post->type ?? 'text';
                             $typeBadge = match($postType) {
@@ -335,7 +603,7 @@
                                     </div>
                                 </div>
 
-                                @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
+                                @if($isTeacherOrAdmin)
                                     <form action="{{ route('announcements.destroy', $post->id) }}" method="POST" onsubmit="return confirm('Delete this post?');">
                                         @csrf
                                         @method('DELETE')
@@ -375,11 +643,11 @@
 
                                     <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                                         @if($isImage)
-                                            <button type="button" onclick="openMediaModal('image', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3">
+                                            <button type="button" onclick="openMediaModal('image', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
                                                 🖼️ View Photo
                                             </button>
                                         @elseif($isAudio)
-                                            <button type="button" onclick="openMediaModal('audio', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3">
+                                            <button type="button" onclick="openMediaModal('audio', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
                                                 🎧 Listen
                                             </button>
                                         @elseif($isPdf && $post->module_id)
@@ -524,7 +792,6 @@
                                             </a>
                                         </div>
                                     @else
-                                        <!-- Teacher Submissions Drawer Toggle -->
                                         <div class="pt-2 border-t-2 border-dashed border-amber-200">
                                             <button type="button" onclick="document.getElementById('subs-drawer-{{ $post->id }}').classList.toggle('hidden')"
                                                     class="text-xs font-black text-[#0066D6] hover:underline cursor-pointer">
@@ -566,8 +833,8 @@
                         </div>
                     @endforeach
 
-                    <!-- Legacy Modules (uploaded before unified stream) -->
-                    @foreach($legacyModules as $module)
+                    <!-- Legacy Modules (not assigned to a module section) -->
+                    @foreach($generalLegacyModules as $module)
                         @php
                             $ext = strtolower($module->file_type ?? pathinfo($module->file_name, PATHINFO_EXTENSION));
                             $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
@@ -590,18 +857,18 @@
 
                             <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                                 @if($isImage)
-                                    <button type="button" onclick="openMediaModal('image', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5">🖼️ View Photo</button>
+                                    <button type="button" onclick="openMediaModal('image', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5 cursor-pointer">🖼️ View Photo</button>
                                 @elseif($isVideo)
-                                    <button type="button" onclick="openMediaModal('video', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5">🎬 Watch Video</button>
+                                    <button type="button" onclick="openMediaModal('video', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5 cursor-pointer">🎬 Watch Video</button>
                                 @elseif($isAudio)
-                                    <button type="button" onclick="openMediaModal('audio', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5">🎧 Listen</button>
+                                    <button type="button" onclick="openMediaModal('audio', '{{ route('modules.view', $module->id) }}', '{{ addslashes($module->title) }}')" class="btn-tactile-teal text-xs py-2 px-3.5 cursor-pointer">🎧 Listen</button>
                                 @elseif($isPdf)
                                     <a href="{{ route('modules.read', $module->id) }}" class="btn-tactile-teal text-xs py-2 px-3.5">📕 Read Lesson</a>
                                 @endif
 
                                 <a href="{{ route('modules.download', $module->id) }}" class="btn-tactile-ghost text-xs py-2 px-3.5">⬇️ Download</a>
 
-                                @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
+                                @if($isTeacherOrAdmin)
                                     <form action="{{ route('modules.destroy', $module->id) }}" method="POST" onsubmit="return confirm('Delete this file?');">
                                         @csrf
                                         @method('DELETE')
@@ -613,9 +880,11 @@
                     @endforeach
                 </div>
             @else
-                <div class="text-center py-10 bg-brand-bg/50 rounded-2xl border-2 border-dashed border-brand-border">
-                    <div class="text-4xl mb-2">📭</div>
-                    <p class="text-xs md:text-sm font-extrabold text-slate-400">No announcements, files, videos, or assignments posted yet.</p>
+                <div class="text-center py-8 bg-brand-bg/50 rounded-2xl border-2 border-dashed border-brand-border">
+                    <div class="text-3xl mb-1.5">📭</div>
+                    <p class="text-xs md:text-sm font-extrabold text-slate-400">
+                        {{ $moduleSections->count() > 0 ? 'All posts are organized inside the modules above.' : 'No announcements, modules, files, videos, or assignments posted yet.' }}
+                    </p>
                 </div>
             @endif
         </div>
@@ -630,10 +899,8 @@
         <!-- CLASS QUIZZES -->
         <div class="card-tactile">
             <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
-                <h3 class="font-display text-lg font-bold text-brand-text">
-                    {{ Auth::user()->isStudent() ? 'Quizzes' : 'Quizzes' }}
-                </h3>
-                @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
+                <h3 class="font-display text-lg font-bold text-brand-text">Quizzes</h3>
+                @if($isTeacherOrAdmin)
                     <a href="{{ route('quiz.create', ['class_id' => $classroom->id]) }}" class="btn-tactile-primary text-xs py-1.5 px-3">
                         ➕ Create
                     </a>
@@ -663,7 +930,7 @@
                                 </p>
                             </div>
                             <div class="flex justify-end gap-2">
-                                @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
+                                @if($isTeacherOrAdmin)
                                     <a href="{{ route('quiz.show', $quiz->id) }}" class="btn-tactile-primary text-xs py-1.5 px-3">View &rarr;</a>
                                 @else
                                     @if($isClosed)
@@ -727,6 +994,39 @@
     </div>
 </div>
 
+@if($isTeacherOrAdmin)
+    <!-- 📚 CREATE MODULE SECTION MODAL -->
+    <div id="create-module-section-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="card-tactile max-w-lg w-full bg-white border-4 border-[#1DC4DF] shadow-2xl p-5 sm:p-6 relative">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
+                <h3 class="font-display font-bold text-base sm:text-lg text-brand-text">📚 Create Module Section</h3>
+                <button type="button" onclick="closeCreateModuleModal()" class="w-8 h-8 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 transition-transform cursor-pointer">✕</button>
+            </div>
+
+            <form action="{{ route('module-sections.store', $classroom->id) }}" method="POST" class="flex flex-col gap-3.5">
+                @csrf
+                <div>
+                    <label class="block text-[11px] font-black text-slate-500 uppercase mb-1">Module Title *</label>
+                    <input type="text" name="title" placeholder="e.g. Module 1: Addition & Subtraction"
+                           class="w-full px-3.5 py-2.5 rounded-xl border-3 border-brand-border bg-brand-bg font-extrabold text-sm text-brand-text focus:outline-none focus:border-[#0066D6]" required>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-black text-amber-800 uppercase mb-1">Teacher Notes for This Module (Optional)</label>
+                    <textarea name="notes" rows="4"
+                              placeholder="Write your lesson notes, key formulas, vocabulary, or study guide specifically for this module..."
+                              class="w-full p-3.5 rounded-xl border-3 border-amber-200 bg-amber-50/40 font-bold text-sm text-brand-text focus:outline-none focus:border-amber-400"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeCreateModuleModal()" class="btn-tactile-ghost text-xs py-2 px-4 cursor-pointer">Cancel</button>
+                    <button type="submit" class="btn-tactile-teal text-xs py-2 px-5 cursor-pointer">Create Module Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endif
+
 <!-- KID-FRIENDLY MEDIA PLAYER MODAL -->
 <div id="media-preview-modal" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
     <div class="card-tactile max-w-3xl w-full bg-white border-4 border-brand-coral shadow-2xl p-5 sm:p-6 relative">
@@ -740,6 +1040,32 @@
 </div>
 
 <script>
+    function openCreateModuleModal() {
+        const modal = document.getElementById('create-module-section-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeCreateModuleModal() {
+        const modal = document.getElementById('create-module-section-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function preparePostInModule(sectionId, postType = 'file') {
+        const select = document.getElementById('field-module-section');
+        if (select) {
+            select.value = String(sectionId);
+        }
+        selectPostType(postType);
+        const form = document.getElementById('classPostComposerForm');
+        if (form) {
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
     function selectPostType(type) {
         const input = document.getElementById('postTypeInput');
         if (input) input.value = type;
@@ -753,7 +1079,6 @@
                     : 'bg-white text-slate-600 border-[#B8E2F8] hover:border-[#1DC4DF]');
         });
 
-        const titleWrap      = document.getElementById('field-title-wrap');
         const titleLabel     = document.getElementById('field-title-label');
         const titleInput     = document.getElementById('field-title');
         const quizWrap       = document.getElementById('field-quiz-wrap');
@@ -767,7 +1092,6 @@
         const contentInput   = document.getElementById('field-content');
         const submitBtn      = document.getElementById('composerSubmitBtn');
 
-        // Reset visibility
         quizWrap?.classList.add('hidden');
         fileWrap?.classList.add('hidden');
         videoWrap?.classList.add('hidden');
@@ -778,12 +1102,12 @@
         if (contentInput) contentInput.required = false;
 
         if (type === 'text') {
-            titleLabel.textContent = 'Headline (Optional)';
-            titleInput.placeholder = 'e.g. Reminder for Friday!';
-            contentLabel.textContent = 'Announcement Message *';
-            contentInput.placeholder = 'Post a friendly update for your students...';
+            titleLabel.textContent = 'Headline / Note Title (Optional)';
+            titleInput.placeholder = 'e.g. Lesson Summary or Reminder';
+            contentLabel.textContent = 'Message / Note *';
+            contentInput.placeholder = 'Write a note or update for your students...';
             contentInput.required = true;
-            submitBtn.innerHTML = '📣 Post Announcement';
+            submitBtn.innerHTML = '📣 Post Note / Announcement';
         } else if (type === 'file') {
             titleLabel.textContent = 'File / Lesson Title *';
             titleInput.placeholder = 'e.g. Lesson 1: Fractions Worksheet';
@@ -924,8 +1248,15 @@
         if (e.target.id === 'media-preview-modal') closeMediaModal();
     });
 
+    document.getElementById('create-module-section-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'create-module-section-modal') closeCreateModuleModal();
+    });
+
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeMediaModal();
+        if (e.key === 'Escape') {
+            closeMediaModal();
+            closeCreateModuleModal();
+        }
     });
 </script>
 @endsection

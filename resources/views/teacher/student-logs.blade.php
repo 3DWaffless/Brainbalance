@@ -6,10 +6,12 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[#E0F7FC] text-[#0066D6] border-2 border-[#B3E5FC] mb-2">
-                Teacher Monitoring
+                My Class Monitoring
             </span>
             <h1 class="text-2xl sm:text-3xl font-black text-[#0D2B4E]">Student Activity Logs</h1>
-            <p class="text-sm font-bold text-[#5A7696] mt-1">View quiz attempts, logins, badge unlocks, and classroom actions across all students.</p>
+            <p class="text-sm font-bold text-[#5A7696] mt-1">
+                Showing activity for students enrolled in your classes when opening class files, submitting assignments, or taking class quizzes.
+            </p>
         </div>
         <div class="flex flex-wrap items-center gap-2.5">
             <a href="{{ route('teacher.student-logs.export', request()->query()) }}"
@@ -18,14 +20,14 @@
             </a>
             <a href="{{ route('subjects.index') }}"
                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white hover:bg-[#F2FAFF] text-[#0D2B4E] font-extrabold text-sm border-[3px] border-[#B8E2F8] shadow-[0_4px_0_#D4F1FC] transition-all">
-                🏫 Classrooms
+                🏫 My Classrooms
             </a>
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC]">
-            <div class="text-xs font-black uppercase text-[#5A7696]">Total Students</div>
+            <div class="text-xs font-black uppercase text-[#5A7696]">My Enrolled Students</div>
             <div class="text-2xl font-black text-[#0D2B4E] mt-1">{{ $stats['total_students'] }}</div>
         </div>
         <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC]">
@@ -33,21 +35,25 @@
             <div class="text-2xl font-black text-[#0066D6] mt-1">{{ $stats['active_today'] }}</div>
         </div>
         <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC]">
-            <div class="text-xs font-black uppercase text-[#5A7696]">Quizzes Completed</div>
-            <div class="text-2xl font-black text-[#16A34A] mt-1">{{ $stats['total_quizzes'] }}</div>
+            <div class="text-xs font-black uppercase text-[#5A7696]">Files Opened</div>
+            <div class="text-2xl font-black text-[#0284C7] mt-1">{{ $stats['total_files'] }}</div>
         </div>
         <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC]">
-            <div class="text-xs font-black uppercase text-[#5A7696]">Matching Log Entries</div>
-            <div class="text-2xl font-black text-[#EA580C] mt-1">{{ $stats['total_logs'] }}</div>
+            <div class="text-xs font-black uppercase text-[#5A7696]">Assignments Turned In</div>
+            <div class="text-2xl font-black text-[#EA580C] mt-1">{{ $stats['total_assignments'] }}</div>
+        </div>
+        <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC] col-span-2 lg:col-span-1">
+            <div class="text-xs font-black uppercase text-[#5A7696]">Class Quizzes Completed</div>
+            <div class="text-2xl font-black text-[#16A34A] mt-1">{{ $stats['total_quizzes'] }}</div>
         </div>
     </div>
 
     <form method="GET" action="{{ route('teacher.student-logs.index') }}"
           class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 sm:p-5 shadow-[0_6px_0_#D4F1FC] mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <div>
-            <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">Classroom</label>
+            <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">My Classroom</label>
             <select name="classroom_id" class="w-full h-11 px-3 rounded-xl border-2 border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E]">
-                <option value="">All Classrooms</option>
+                <option value="">All My Classrooms</option>
                 @foreach ($classrooms as $classroom)
                     <option value="{{ $classroom->id }}" @selected((string) request('classroom_id') === (string) $classroom->id)>
                         {{ $classroom->name }}
@@ -59,7 +65,7 @@
         <div>
             <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">Student</label>
             <select name="student_id" class="w-full h-11 px-3 rounded-xl border-2 border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E]">
-                <option value="">All Students</option>
+                <option value="">All My Students</option>
                 @foreach ($students as $student)
                     <option value="{{ $student->id }}" @selected((string) request('student_id') === (string) $student->id)>
                         {{ trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) ?: $student->name }}
@@ -69,14 +75,12 @@
         </div>
 
         <div>
-            <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">Category</label>
+            <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">Class Activity</label>
             <select name="category" class="w-full h-11 px-3 rounded-xl border-2 border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E]">
-                <option value="all" @selected(request('category', 'all') === 'all')>All Activity</option>
+                <option value="all" @selected(request('category', 'all') === 'all')>All Class Activity</option>
+                <option value="file" @selected(request('category') === 'file')>Opened Files</option>
+                <option value="assignment" @selected(request('category') === 'assignment')>Submitted Assignments</option>
                 <option value="quiz" @selected(request('category') === 'quiz')>Quiz Attempts</option>
-                <option value="auth" @selected(request('category') === 'auth')>Logins &amp; Signups</option>
-                <option value="badge" @selected(request('category') === 'badge')>Badges Earned</option>
-                <option value="classroom" @selected(request('category') === 'classroom')>Classrooms</option>
-                <option value="profile" @selected(request('category') === 'profile')>Profile Updates</option>
             </select>
         </div>
 
@@ -88,7 +92,7 @@
 
         <div>
             <label class="block text-[11px] font-black uppercase text-[#3E5A7A] mb-1">Search</label>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, email, quiz..."
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Student, file, quiz..."
                    class="w-full h-11 px-3 rounded-xl border-2 border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-sm text-[#0D2B4E]">
         </div>
 
@@ -111,8 +115,9 @@
                     <tr class="bg-[#F2FAFF] border-b-2 border-[#B8E2F8] text-xs font-black uppercase tracking-wider text-[#3E5A7A]">
                         <th class="py-3.5 px-4">When</th>
                         <th class="py-3.5 px-4">Student</th>
+                        <th class="py-3.5 px-4">Classroom</th>
                         <th class="py-3.5 px-4">Category</th>
-                        <th class="py-3.5 px-4">Activity</th>
+                        <th class="py-3.5 px-4">Class Activity</th>
                         <th class="py-3.5 px-4">Details</th>
                     </tr>
                 </thead>
@@ -143,18 +148,27 @@
                                 </div>
                             </td>
                             <td class="py-3.5 px-4 whitespace-nowrap">
+                                <span class="px-2.5 py-1 rounded-xl bg-[#F2FAFF] border border-[#B8E2F8] text-xs font-black text-[#0D2B4E]">
+                                    {{ $log['classroom_name'] ?? 'Class' }}
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 whitespace-nowrap">
                                 @php
                                     $badgeStyles = [
-                                        'quiz'      => 'bg-[#ECFDF5] text-[#047857] border-[#6EE7B7]',
-                                        'auth'      => 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]',
-                                        'badge'     => 'bg-[#FEF3C7] text-[#B45309] border-[#FCD34D]',
-                                        'classroom' => 'bg-[#F3E8FF] text-[#6D28D9] border-[#C4B5FD]',
-                                        'profile'   => 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74]',
+                                        'quiz'       => 'bg-[#ECFDF5] text-[#047857] border-[#6EE7B7]',
+                                        'file'       => 'bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]',
+                                        'assignment' => 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74]',
+                                    ];
+                                    $categoryLabels = [
+                                        'quiz'       => 'Quiz',
+                                        'file'       => 'File Opened',
+                                        'assignment' => 'Assignment',
                                     ];
                                     $style = $badgeStyles[$log['category']] ?? 'bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]';
+                                    $label = $categoryLabels[$log['category']] ?? ucfirst($log['category']);
                                 @endphp
                                 <span class="inline-block px-2.5 py-1 rounded-full text-xs font-black uppercase border {{ $style }}">
-                                    {{ $log['category'] }}
+                                    {{ $label }}
                                 </span>
                             </td>
                             <td class="py-3.5 px-4">
@@ -179,8 +193,8 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="py-12 text-center text-[#5A7696] font-extrabold">
-                                No student activity logs matched your filters.
+                            <td colspan="6" class="py-12 text-center text-[#5A7696] font-extrabold">
+                                No student activity logs found for your classes yet.
                             </td>
                         </tr>
                     @endforelse

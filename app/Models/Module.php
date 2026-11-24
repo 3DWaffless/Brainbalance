@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Module extends Model
 {
@@ -11,7 +12,9 @@ class Module extends Model
 
     protected $fillable = [
         'class_id',
+        'module_section_id',
         'title',
+        'description',
         'file_name',
         'file_path',
         'file_type',
@@ -36,8 +39,13 @@ class Module extends Model
         return number_format($bytes / 1024, 0) . ' KB';
     }
 
-    public function classroom()
+    public function classroom(): BelongsTo
     {
         return $this->belongsTo(Classroom::class, 'class_id');
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(ModuleSection::class, 'module_section_id');
     }
 }

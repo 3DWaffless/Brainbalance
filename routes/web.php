@@ -10,6 +10,7 @@ use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\StudentLogController;
+use App\Http\Middleware\TrackStudentClassActivity;
 use App\Models\StudentBadge;
 
 Route::get('/', function () {
@@ -48,13 +49,24 @@ Route::middleware('auth')->group(function () {
 
     // Unified Class Stream / Announcement Routes
     Route::post('/classes/{classroom}/announcements', [SubjectController::class, 'storeAnnouncement'])->name('announcements.store');
-    Route::get('/announcements/{announcement}/view', [SubjectController::class, 'viewAttachment'])->name('announcements.view');
-    Route::get('/announcements/{announcement}/download', [SubjectController::class, 'downloadAttachment'])->name('announcements.download');
+    Route::get('/announcements/{announcement}/view', [SubjectController::class, 'viewAttachment'])
+        ->middleware(TrackStudentClassActivity::class)
+        ->name('announcements.view');
+    Route::get('/announcements/{announcement}/download', [SubjectController::class, 'downloadAttachment'])
+        ->middleware(TrackStudentClassActivity::class)
+        ->name('announcements.download');
     Route::delete('/announcements/{announcement}', [SubjectController::class, 'destroyAnnouncement'])->name('announcements.destroy');
+
+    // Module Sections (Per-Module Notes & Organization)
+    Route::post('/classes/{classroom}/module-sections', [ModuleController::class, 'storeSection'])->name('module-sections.store');
+    Route::put('/module-sections/{section}', [ModuleController::class, 'updateSection'])->name('module-sections.update');
+    Route::delete('/module-sections/{section}', [ModuleController::class, 'destroySection'])->name('module-sections.destroy');
 
     // Student & Teacher Assignments Routes
     Route::get('/assignments', [AssignmentController::class, 'index'])->name('assignments.index');
-    Route::post('/assignments/{announcement}/submit', [AssignmentController::class, 'submit'])->name('assignments.submit');
+    Route::post('/assignments/{announcement}/submit', [AssignmentController::class, 'submit'])
+        ->middleware(TrackStudentClassActivity::class)
+        ->name('assignments.submit');
     Route::post('/assignments/submissions/{submission}/grade', [AssignmentController::class, 'grade'])->name('assignments.grade');
     Route::get('/assignments/submissions/{submission}/download', [AssignmentController::class, 'downloadSubmission'])->name('assignments.submission.download');
 
@@ -89,7 +101,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/quiz/store', [QuizController::class, 'store'])->name('quiz.store');
     
     // Student Interactive Quiz Runner Routes (AJAX)
-    Route::post('/quiz/start', [QuizController::class, 'start'])->name('quiz.start');
+    Route::post('/quiz/start', [QuizController::class, 'start'])
+        ->middleware(TrackStudentClassActivity::class)
+        ->name('quiz.start');
     Route::post('/quiz/answer', [QuizController::class, 'submitAnswer'])->name('quiz.submitAnswer');
     Route::post('/quiz/generate-pdf', [QuizController::class, 'generateFromPdf'])->name('quiz.generateFromPdf');
 

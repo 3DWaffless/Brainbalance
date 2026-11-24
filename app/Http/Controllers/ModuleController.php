@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Classroom;
 use App\Models\Module;
+use App\Models\ModuleSection;
+use App\Models\StudentActivityLog;
 use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class ModuleController extends Controller
@@ -99,6 +103,53 @@ class ModuleController extends Controller
         };
     }
 
+    protected function authorizeClassroomOwner(Classroom $classroom): void
+    {
+        $user = Auth::user();
+        abort_unless($user && ($user->isTeacher() || $user->role === 'admin'), 403);
+
+        if ($user->role !== 'admin') {
+            abort_unless((int) $classroom->teacher_id === (int) $user->id, 403);
+        }
+    }
+
+    protected function recordStudentModuleAccess(Module $module, string $action): void
+    {
+        $user = Auth::user();
+        if (!$user || !$user->isStudent() || !$module->class_id) {
+            return;
+        }
+
+        $classId = (int) $module->class_id;
+
+        $alreadyLoggedRecently = Schema::hasTable('student_activity_logs') && StudentActivityLog::where('user_id', $user->id)
+            ->when(Schema::hasColumn('student_activity_logs', 'class_id'), fn ($q) => $q->where('class_id', $classId))
+            ->where('action', $action)
+            ->where('description', 'like', '%' . $module->title . '%')
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->exists();
+
+        if ($alreadyLoggedRecently) {
+            return;
+        }
+
+        $className = $module->classroom?->name ?? 'Classroom';
+
+        StudentActivityLog::record(
+            $user->id,
+            $action,
+            'file',
+            "{$action}: \"{$module->title}\" in {$className}",
+            [
+                'class_id'   => $classId,
+                'class_name' => $className,
+                'module_id'  => (int) $module->id,
+                'file_name'  => $module->file_name,
+            ],
+            $classId
+        );
+    }
+
     public function index()
     {
         $user = Auth::user();
@@ -116,19 +167,79 @@ class ModuleController extends Controller
         return view('modules.index', compact('modules'));
     }
 
+    public function storeSection(Request $request, Classroom $classroom)
+    {
+        $this->authorizeClassroomOwner($classroom);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:10000',
+        ]);
+
+        $nextPos = (int) ModuleSection::where('class_id', $classroom->id)->max('position') + 1;
+
+        ModuleSection::create([
+            'class_id'   => $classroom->id,
+            'teacher_id' => Auth::id(),
+            'title'      => trim($validated['title']),
+            'notes'      => filled($validated['notes'] ?? null) ? trim($validated['notes']) : null,
+            'position'   => $nextPos,
+        ]);
+
+        return back()->with('success', 'Module section created! You can now add notes and files to it.');
+    }
+
+    public function updateSection(Request $request, ModuleSection $section)
+    {
+        $classroom = Classroom::findOrFail($section->class_id);
+        $this->authorizeClassroomOwner($classroom);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:10000',
+        ]);
+
+        $section->update([
+            'title' => trim($validated['title']),
+            'notes' => filled($validated['notes'] ?? null) ? trim($validated['notes']) : null,
+        ]);
+
+        return back()->with('success', 'Module notes and title updated!');
+    }
+
+    public function destroySection(ModuleSection $section)
+    {
+        $classroom = Classroom::findOrFail($section->class_id);
+        $this->authorizeClassroomOwner($classroom);
+
+        $section->delete();
+
+        return back()->with('success', 'Module section removed. Any files or posts inside were moved to the General Stream.');
+    }
+
     public function store(Request $request)
     {
         $user = Auth::user();
         abort_unless($user->isTeacher() || $user->role === 'admin', 403);
 
         $request->validate([
-            'class_id' => 'required|exists:classes,id',
-            'title'    => 'required|string|max:255',
-            'file'     => 'required|file|max:51200',
+            'class_id'          => 'required|exists:classes,id',
+            'module_section_id' => 'nullable|exists:module_sections,id',
+            'title'             => 'required|string|max:255',
+            'description'       => 'nullable|string|max:5000',
+            'file'              => 'required|file|max:51200',
         ]);
 
         if ($user->role !== 'admin') {
             abort_unless($user->ownedClasses->contains($request->class_id), 403);
+        }
+
+        $sectionId = null;
+        if ($request->filled('module_section_id')) {
+            $section = ModuleSection::where('id', (int) $request->module_section_id)
+                ->where('class_id', (int) $request->class_id)
+                ->first();
+            $sectionId = $section?->id;
         }
 
         $file = $request->file('file');
@@ -144,21 +255,31 @@ class ModuleController extends Controller
             return back()->withErrors(['file' => 'Upload failed (' . $disk . '): ' . $reason])->withInput();
         }
 
-        Module::create([
+        $attributes = [
             'class_id'  => $request->class_id,
-            'title'     => $request->title,
+            'title'     => trim($request->title),
             'file_name' => $file->getClientOriginalName(),
             'file_path' => $filePath,
             'file_type' => strtolower($file->getClientOriginalExtension() ?: 'file'),
             'file_size' => $file->getSize(),
-        ]);
+        ];
 
-        return back()->with('success', 'Module uploaded successfully!');
+        if (Schema::hasColumn('modules', 'module_section_id')) {
+            $attributes['module_section_id'] = $sectionId;
+        }
+        if (Schema::hasColumn('modules', 'description') && $request->filled('description')) {
+            $attributes['description'] = trim($request->description);
+        }
+
+        Module::create($attributes);
+
+        return back()->with('success', 'Module file uploaded successfully!');
     }
 
     public function read(Module $module)
     {
         $this->authorizeModuleAccess($module);
+        $this->recordStudentModuleAccess($module, 'Opened Module Lesson');
 
         return view('modules.read', compact('module'));
     }
@@ -183,6 +304,7 @@ class ModuleController extends Controller
     public function view(Module $module)
     {
         $this->authorizeModuleAccess($module);
+        $this->recordStudentModuleAccess($module, 'Opened Class File');
 
         $disk = $this->resolveDiskForPath($module->file_path);
         if (!$disk) {
@@ -208,6 +330,7 @@ class ModuleController extends Controller
     public function download(Module $module)
     {
         $this->authorizeModuleAccess($module);
+        $this->recordStudentModuleAccess($module, 'Downloaded Class File');
 
         $disk = $this->resolveDiskForPath($module->file_path);
         if (!$disk) {
