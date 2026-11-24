@@ -57,6 +57,7 @@
                         'pillBg'   => 'bg-lime-600 text-white border-lime-700',
                         'emoji'    => '📖',
                         'btn'      => 'btn-tactile-teal',
+                    ],
                     default => [
                         'headerBg' => 'linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%)',
                         'border'   => 'border-amber-300',
