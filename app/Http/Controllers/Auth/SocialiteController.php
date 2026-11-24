@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -15,12 +14,13 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 
 class SocialiteController extends Controller
 {
     protected function googleDriver()
     {
-        $redirectUrl = (string) config('services.google.redirect');
+        $redirectUrl = trim((string) config('services.google.redirect'), " \t\n\r\0\x0B\"'");
 
         if (
             !app()->environment('local')
@@ -37,13 +37,7 @@ class SocialiteController extends Controller
             $redirectUrl = 'https://' . substr($redirectUrl, 7);
         }
 
-        $driver = Socialite::driver('google')->redirectUrl($redirectUrl);
-
-        if (app()->environment('local')) {
-            $driver->setHttpClient(new Client(['verify' => false]));
-        }
-
-        return $driver;
+        return Socialite::driver('google')->redirectUrl($redirectUrl);
     }
 
     public function redirectToGoogle()
@@ -55,9 +49,13 @@ class SocialiteController extends Controller
     {
         try {
             $googleUser = $this->googleDriver()->user();
+        } catch (InvalidStateException $e) {
+            Log::error('Google OAuth InvalidStateException: session cookie missing or mismatched.');
+            return redirect()->route('login')->with('error', 'Google sign-in session expired (Invalid State). Please try again.');
         } catch (\Throwable $e) {
-            Log::error('Google OAuth Callback Error: ' . $e->getMessage());
-            return redirect()->route('login')->with('error', 'Google sign-in failed: ' . $e->getMessage());
+            Log::error('Google OAuth Callback Error [' . get_class($e) . ']: ' . $e->getMessage());
+            $detail = $e->getMessage() ?: class_basename($e);
+            return redirect()->route('login')->with('error', 'Google sign-in failed: ' . $detail);
         }
 
         $email = $googleUser->getEmail();
@@ -78,7 +76,6 @@ class SocialiteController extends Controller
             Auth::login($existingUser, true);
             $request->session()->regenerate();
 
-            // Redirect admins directly to the Admin Dashboard
             if ($existingUser->role === 'admin' || (method_exists($existingUser, 'isAdmin') && $existingUser->isAdmin())) {
                 return redirect()->route('admin.dashboard');
             }
@@ -187,17 +184,11 @@ class SocialiteController extends Controller
             $fileName = 'avatar_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
             $uploadUrl = "{$supabaseUrl}/storage/v1/object/avatars/{$fileName}";
 
-            $http = Http::withHeaders([
+            $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $serviceKey,
                 'apikey'        => $serviceKey,
                 'Content-Type'  => $file->getMimeType(),
-            ]);
-
-            if (app()->environment('local')) {
-                $http->withoutVerifying();
-            }
-
-            $response = $http->withBody(file_get_contents($file->getRealPath()), $file->getMimeType())->post($uploadUrl);
+            ])->withBody(file_get_contents($file->getRealPath()), $file->getMimeType())->post($uploadUrl);
 
             if ($response->successful()) {
                 return "{$supabaseUrl}/storage/v1/object/public/avatars/{$fileName}";
