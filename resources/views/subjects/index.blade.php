@@ -14,10 +14,10 @@
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-sky-200 text-brand-coral font-black text-[11px] uppercase tracking-wider mb-2 shadow-2xs">
-                <span>{{ $isTeacherOrAdmin ? 'Class Management' : '🗺️ Explorer Map' }}</span>
+                <span>{{ $isTeacherOrAdmin ? '🏫 Class Management' : 'Classroom' }}</span>
             </div>
             <h1 class="font-display text-2xl sm:text-3xl font-bold text-brand-text flex items-center gap-2">
-                {{ $isTeacherOrAdmin ? 'Manage Subjects & Classes' : 'My Subjects' }}
+                {{ $isTeacherOrAdmin ? 'Manage Subjects & Classes 📚' : 'My Classrooms 🎒' }}
             </h1>
             <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
                 {{ $isTeacherOrAdmin
@@ -110,7 +110,7 @@
                         👥 {{ $class->students_count ?? $class->students()->count() }} {{ $isTeacherOrAdmin ? 'Enrolled' : 'Classmates' }}
                     </span>
                     <span class="{{ $theme['btn'] }} text-xs py-1.5 px-3.5 group-hover:translate-x-0.5 transition-transform">
-                        {{ $isTeacherOrAdmin ? 'Manage' : 'Enter World' }} &rarr;
+                        {{ $isTeacherOrAdmin ? 'Manage Classroom' : 'Enter Classroom' }} &rarr;
                     </span>
                 </div>
             </a>
@@ -118,8 +118,7 @@
     </div>
 @else
     <div class="card-tactile text-center py-14 px-4 bg-white">
-        <div class="text-5xl mb-3">🗺️</div>
-        <h3 class="font-display text-xl font-bold text-brand-text mb-1">No Subject Worlds Yet</h3>
+        <h3 class="font-display text-xl font-bold text-brand-text mb-1">No Subjects Yet</h3>
         <p class="text-xs sm:text-sm font-bold text-slate-400 max-w-md mx-auto mb-5">
             {{ $isTeacherOrAdmin
                 ? 'Create a classroom on your dashboard to begin managing subjects and quizzes.'
@@ -128,6 +127,6 @@
         <a href="{{ route('dashboard') }}" class="btn-tactile-primary text-xs py-2.5 px-5">
             &larr; Go to Dashboard
         </a>
-    </div>
+    </div>  
 @endif
 @endsection

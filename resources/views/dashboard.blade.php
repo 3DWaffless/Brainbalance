@@ -185,7 +185,6 @@
                     </div>
                 @else
                     <div class="text-center py-10 bg-brand-bg/60 rounded-2xl border-2 border-dashed border-brand-border">
-                        <div class="text-4xl mb-2">🗺️</div>
                         <p class="text-xs sm:text-sm font-extrabold text-slate-500 mb-3">
                             @if(Auth::user()->isTeacher())
                                 No classrooms created yet.

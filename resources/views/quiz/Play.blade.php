@@ -431,7 +431,7 @@
 
     function renderQuestion(data) {
         pendingQuestion = data.question;
-        document.getElementById('question-counter').textContent = `🗺️ Question ${data.question_number} of ${data.total_questions}`;
+        document.getElementById('question-counter').textContent = ` Question ${data.question_number} of ${data.total_questions}`;
         document.getElementById('level-pill').textContent = data.level;
         document.getElementById('beam-fill').style.width = `${(data.question_number / data.total_questions) * 100}%`;
         document.getElementById('streak-count').textContent = currentStreak;
