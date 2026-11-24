@@ -48,6 +48,90 @@
 
     $generalLegacyModules = $legacyModules
         ->filter(fn ($m) => empty($m->module_section_id));
+
+    // Teacher Student Performance Metrics (Top 3 + Per-Quiz Average % Breakdown)
+    $classQuizzes = isset($classroom->quizzes) ? $classroom->quizzes : collect();
+    $studentPerformances = collect();
+
+    if ($isTeacherOrAdmin && $classroom->students->count() > 0) {
+        $quizIds    = $classQuizzes->pluck('id')->all();
+        $studentIds = $classroom->students->pluck('id')->all();
+        $attemptUserCol = \Illuminate\Support\Facades\Schema::hasTable('quiz_attempts')
+            && \Illuminate\Support\Facades\Schema::hasColumn('quiz_attempts', 'student_id')
+            ? 'student_id'
+            : 'user_id';
+
+        $allClassAttempts = (!empty($quizIds) && !empty($studentIds) && \Illuminate\Support\Facades\Schema::hasTable('quiz_attempts'))
+            ? \App\Models\QuizAttempt::whereIn('quiz_id', $quizIds)
+                ->whereIn($attemptUserCol, $studentIds)
+                ->get()
+            : collect();
+
+        $attemptsByStudent = $allClassAttempts->groupBy($attemptUserCol);
+
+        $studentPerformances = $classroom->students->map(function ($student) use ($classQuizzes, $attemptsByStudent) {
+            $studentAttempts = $attemptsByStudent->get($student->id, collect());
+            $perQuiz      = [];
+            $quizAverages = [];
+
+            foreach ($classQuizzes as $quiz) {
+                $qAttempts    = $studentAttempts->where('quiz_id', $quiz->id);
+                $attemptCount = $qAttempts->count();
+
+                if ($attemptCount > 0) {
+                    $fallbackTotal = $quiz->questions->count();
+                    $percentages = $qAttempts->map(function ($att) use ($fallbackTotal) {
+                        $total = (float) ($att->total_questions ?? $att->max_score ?? $fallbackTotal);
+                        $score = (float) ($att->score ?? 0);
+                        if ($total <= 0) {
+                            return 0.0;
+                        }
+                        return min(100.0, max(0.0, ($score / $total) * 100));
+                    });
+
+                    $avgPct = round($percentages->avg(), 1);
+                    $perQuiz[$quiz->id] = [
+                        'avg'      => $avgPct,
+                        'attempts' => $attemptCount,
+                    ];
+                    $quizAverages[] = $avgPct;
+                } else {
+                    $perQuiz[$quiz->id] = [
+                        'avg'      => null,
+                        'attempts' => 0,
+                    ];
+                }
+            }
+
+            $quizzesTaken = count($quizAverages);
+            $overallAvg   = $quizzesTaken > 0 ? round(collect($quizAverages)->avg(), 1) : null;
+
+            return [
+                'student'       => $student,
+                'overall_avg'   => $overallAvg,
+                'has_attempts'  => $quizzesTaken > 0,
+                'quizzes_taken' => $quizzesTaken,
+                'per_quiz'      => $perQuiz,
+            ];
+        })->sort(function ($a, $b) {
+            if ($a['has_attempts'] !== $b['has_attempts']) {
+                return $b['has_attempts'] <=> $a['has_attempts'];
+            }
+            if (($a['overall_avg'] ?? -1) !== ($b['overall_avg'] ?? -1)) {
+                return ($b['overall_avg'] ?? -1) <=> ($a['overall_avg'] ?? -1);
+            }
+            if ($a['quizzes_taken'] !== $b['quizzes_taken']) {
+                return $b['quizzes_taken'] <=> $a['quizzes_taken'];
+            }
+            return ($b['student']->total_xp ?? 0) <=> ($a['student']->total_xp ?? 0);
+        })->values();
+    }
+
+    $topThreeStudents  = $studentPerformances->take(3);
+    $attemptedStudents = $studentPerformances->where('has_attempts', true);
+    $classOverallAvg   = $attemptedStudents->count() > 0
+        ? round($attemptedStudents->avg('overall_avg'), 1)
+        : null;
 @endphp
 
 <!-- NEW BADGE UNLOCKED NOTIFICATION BANNER -->
@@ -890,7 +974,7 @@
         </div>
     </div>
 
-    <!-- Right Column (4 Cols on Desktop): Treasure Chest, Quizzes & Student Roster -->
+    <!-- Right Column (4 Cols on Desktop): Treasure Chest, Quizzes & Student Performance / Roster -->
     <div class="lg:col-span-4 flex flex-col gap-6">
 
         <!-- 🧰 STUDENT MEDAL TREASURE CHEST -->
@@ -955,38 +1039,111 @@
             @endif
         </div>
 
-        <!-- ENROLLED STUDENTS ROSTER -->
+        <!-- STUDENTS CARD: TOP 3 PERFORMERS + IN-DEPTH PERFORMANCE BUTTON (TEACHER) / ROSTER (STUDENT) -->
         <div class="card-tactile">
-            <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
-                <h3 class="font-display text-lg font-bold text-brand-text">Students</h3>
-                <span class="bg-brand-teal text-white font-black text-xs px-2.5 py-1 rounded-full">
-                    {{ $classroom->students->count() }}
-                </span>
+            <div class="flex justify-between items-center gap-2 mb-4 pb-3 border-b-4 border-dashed border-brand-border">
+                <div class="flex items-center gap-2">
+                    <h3 class="font-display text-lg font-bold text-brand-text">Students</h3>
+                    <span class="bg-brand-teal text-white font-black text-xs px-2.5 py-0.5 rounded-full">
+                        {{ $classroom->students->count() }}
+                    </span>
+                </div>
+
+                @if($isTeacherOrAdmin)
+                    <button type="button"
+                            onclick="openStudentPerformanceModal()"
+                            class="btn-tactile-primary text-xs py-1.5 px-3 cursor-pointer shrink-0"
+                            title="View full student quiz performance breakdown">
+                        📊 Performance
+                    </button>
+                @endif
             </div>
 
             @if($classroom->students->count() > 0)
-                <div class="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
-                    @foreach($classroom->students->sortByDesc('total_xp') as $idx => $student)
-                        <div class="flex items-center justify-between p-3 bg-brand-bg border-2 border-brand-border rounded-2xl">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="w-9 h-9 rounded-full bg-brand-coral text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-2xs shrink-0">
-                                    {{ strtoupper(substr($student->first_name ?? 'S', 0, 1)) }}
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="font-black text-xs text-brand-text truncate">
-                                        {{ $student->first_name }} {{ $student->last_name }}
+                @if($isTeacherOrAdmin)
+                    <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2.5 flex items-center justify-between">
+                        <span>🏆 Top 3 Performing Students</span>
+                        @if($classOverallAvg !== null)
+                            <span class="text-[#0066D6]">Class Avg: {{ $classOverallAvg }}%</span>
+                        @endif
+                    </div>
+
+                    <div class="flex flex-col gap-2.5">
+                        @foreach($topThreeStudents as $idx => $perf)
+                            @php
+                                $student   = $perf['student'];
+                                $rankMedal = match($idx) {
+                                    0 => '🥇',
+                                    1 => '🥈',
+                                    2 => '🥉',
+                                    default => '#' . ($idx + 1),
+                                };
+                                $cardTint = match($idx) {
+                                    0 => 'bg-amber-50/80 border-amber-300',
+                                    1 => 'bg-slate-50/90 border-slate-300',
+                                    2 => 'bg-orange-50/70 border-orange-200',
+                                    default => 'bg-brand-bg border-brand-border',
+                                };
+                                $avgScore = $perf['overall_avg'];
+                                $scorePillClass = match(true) {
+                                    $avgScore === null => 'bg-slate-100 text-slate-500 border-slate-200',
+                                    $avgScore >= 85    => 'bg-lime-100 text-lime-800 border-lime-300',
+                                    $avgScore >= 70    => 'bg-sky-100 text-[#0066D6] border-sky-300',
+                                    default            => 'bg-amber-100 text-amber-800 border-amber-300',
+                                };
+                            @endphp
+                            <div class="flex items-center justify-between gap-2 p-3 border-2 rounded-2xl {{ $cardTint }}">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="text-lg shrink-0" title="Rank #{{ $idx + 1 }}">{{ $rankMedal }}</span>
+                                    <div class="w-9 h-9 rounded-full bg-brand-coral text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-2xs shrink-0">
+                                        {{ strtoupper(substr($student->first_name ?? 'S', 0, 1)) }}
                                     </div>
-                                    <div class="text-[10px] font-extrabold text-brand-coral">
-                                        ⭐ Level {{ $student->level ?? 1 }} &bull; {{ number_format($student->total_xp ?? 0) }} XP
+                                    <div class="min-w-0">
+                                        <div class="font-black text-xs text-brand-text truncate">
+                                            {{ $student->first_name }} {{ $student->last_name }}
+                                        </div>
+                                        <div class="text-[10px] font-extrabold text-slate-500">
+                                            {{ $perf['quizzes_taken'] }}/{{ $classQuizzes->count() }} quizzes &bull; {{ number_format($student->total_xp ?? 0) }} XP
+                                        </div>
                                     </div>
                                 </div>
+
+                                <span class="px-2.5 py-1 rounded-xl border text-xs font-black shrink-0 {{ $scorePillClass }}">
+                                    {{ $avgScore !== null ? $avgScore . '%' : 'No quiz' }}
+                                </span>
                             </div>
-                            @if($idx === 0 && ($student->total_xp ?? 0) > 0)
-                                <span class="text-base shrink-0" title="Top XP Explorer">👑</span>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
+
+                    <button type="button"
+                            onclick="openStudentPerformanceModal()"
+                            class="mt-3 w-full py-2.5 px-3 rounded-2xl bg-[#F2FAFF] hover:bg-[#E0F2FE] border-2 border-[#B8E2F8] text-[#0066D6] font-black text-xs transition-colors cursor-pointer">
+                        View All {{ $classroom->students->count() }} Students &amp; Per-Quiz Scores &rarr;
+                    </button>
+                @else
+                    <div class="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
+                        @foreach($classroom->students->sortByDesc('total_xp') as $idx => $student)
+                            <div class="flex items-center justify-between p-3 bg-brand-bg border-2 border-brand-border rounded-2xl">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-full bg-brand-coral text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-2xs shrink-0">
+                                        {{ strtoupper(substr($student->first_name ?? 'S', 0, 1)) }}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="font-black text-xs text-brand-text truncate">
+                                            {{ $student->first_name }} {{ $student->last_name }}
+                                        </div>
+                                        <div class="text-[10px] font-extrabold text-brand-coral">
+                                            ⭐ Level {{ $student->level ?? 1 }} &bull; {{ number_format($student->total_xp ?? 0) }} XP
+                                        </div>
+                                    </div>
+                                </div>
+                                @if($idx === 0 && ($student->total_xp ?? 0) > 0)
+                                    <span class="text-base shrink-0" title="Top XP Explorer">👑</span>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             @else
                 <p class="text-xs font-bold text-slate-400 text-center py-4">No students enrolled yet.</p>
             @endif
@@ -995,6 +1152,183 @@
 </div>
 
 @if($isTeacherOrAdmin)
+    <!-- 📊 IN-DEPTH STUDENT PERFORMANCE MODAL -->
+    <div id="student-performance-modal" class="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 hidden items-center justify-center p-3 sm:p-5">
+        <div class="card-tactile max-w-5xl w-full max-h-[90vh] flex flex-col bg-white border-4 border-[#0066D6] shadow-2xl p-4 sm:p-6 relative">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-3 pb-3 mb-4 border-b-4 border-dashed border-brand-border shrink-0">
+                <div>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E0F7FC] text-[#0066D6] border border-[#B3E5FC] font-black text-[10px] uppercase tracking-wider mb-1">
+                        Class Analytics
+                    </span>
+                    <h3 class="font-display font-bold text-lg sm:text-xl text-brand-text">
+                        📊 Student Quiz Performance &mdash; {{ $classroom->name }}
+                    </h3>
+                    <p class="text-xs font-bold text-slate-500 mt-0.5">
+                        Average score percentage per quiz across all {{ $classroom->students->count() }} enrolled students.
+                    </p>
+                </div>
+                <button type="button" onclick="closeStudentPerformanceModal()"
+                        class="w-9 h-9 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 transition-transform shrink-0 cursor-pointer">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Summary KPI Strip -->
+            <div class="grid grid-cols-3 gap-3 mb-4 shrink-0">
+                <div class="p-3 rounded-2xl bg-[#F2FAFF] border-2 border-[#B8E2F8]">
+                    <div class="text-[10px] font-black uppercase text-slate-500">Class Quiz Average</div>
+                    <div class="text-lg sm:text-2xl font-black text-[#0066D6] mt-0.5">
+                        {{ $classOverallAvg !== null ? $classOverallAvg . '%' : '—' }}
+                    </div>
+                </div>
+                <div class="p-3 rounded-2xl bg-[#F0FDF4] border-2 border-[#BBF7D0]">
+                    <div class="text-[10px] font-black uppercase text-slate-500">Class Quizzes</div>
+                    <div class="text-lg sm:text-2xl font-black text-[#15803D] mt-0.5">
+                        {{ $classQuizzes->count() }}
+                    </div>
+                </div>
+                <div class="p-3 rounded-2xl bg-[#FFFBEB] border-2 border-[#FDE68A]">
+                    <div class="text-[10px] font-black uppercase text-slate-500">Enrolled Students</div>
+                    <div class="text-lg sm:text-2xl font-black text-[#B45309] mt-0.5">
+                        {{ $classroom->students->count() }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search & Sort Controls -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3 shrink-0">
+                <input type="text"
+                       id="perfSearchInput"
+                       oninput="filterAndSortPerformanceTable()"
+                       placeholder="🔍 Search student by name..."
+                       class="flex-1 px-3.5 py-2 rounded-xl border-2 border-[#B8E2F8] bg-[#F2FAFF] font-extrabold text-xs sm:text-sm text-brand-text focus:outline-none focus:border-[#0066D6]">
+
+                <select id="perfSortSelect"
+                        onchange="filterAndSortPerformanceTable()"
+                        class="px-3.5 py-2 rounded-xl border-2 border-[#B8E2F8] bg-white font-extrabold text-xs sm:text-sm text-brand-text focus:outline-none focus:border-[#0066D6]">
+                    <option value="highest">Sort: Highest Overall Avg %</option>
+                    <option value="lowest">Sort: Lowest Overall Avg %</option>
+                    <option value="quizzes">Sort: Most Quizzes Taken</option>
+                    <option value="name">Sort: Student Name (A–Z)</option>
+                </select>
+            </div>
+
+            <!-- Scrollable Per-Quiz Student Performance Table -->
+            <div class="overflow-auto rounded-2xl border-3 border-[#B8E2F8] flex-1">
+                @if($classroom->students->count() > 0)
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead class="bg-[#F2FAFF] border-b-2 border-[#B8E2F8] text-[11px] font-black uppercase tracking-wider text-[#3E5A7A] sticky top-0 z-10">
+                            <tr>
+                                <th class="py-3 px-3.5 whitespace-nowrap">Rank</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">Student</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">Overall Avg</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">Completed</th>
+                                @foreach($classQuizzes as $quiz)
+                                    <th class="py-3 px-3.5 min-w-[140px]" title="{{ $quiz->title }}">
+                                        <div class="truncate max-w-[160px] text-[#0D2B4E]">{{ $quiz->title }}</div>
+                                        <div class="text-[10px] font-bold text-slate-400 normal-case">Avg % ({{ $quiz->questions->count() }} Qs)</div>
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody id="perfTableBody" class="divide-y divide-[#E0F2FE] font-bold text-brand-text">
+                            @foreach($studentPerformances as $idx => $perf)
+                                @php
+                                    $student   = $perf['student'];
+                                    $fullName  = trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) ?: ($student->name ?? 'Student');
+                                    $avgScore  = $perf['overall_avg'];
+                                    $rankBadge = match($idx) {
+                                        0 => '🥇 #1',
+                                        1 => '🥈 #2',
+                                        2 => '🥉 #3',
+                                        default => '#' . ($idx + 1),
+                                    };
+                                    $overallBadgeClass = match(true) {
+                                        $avgScore === null => 'bg-slate-100 text-slate-500 border-slate-200',
+                                        $avgScore >= 85    => 'bg-lime-100 text-lime-800 border-lime-300',
+                                        $avgScore >= 70    => 'bg-sky-100 text-[#0066D6] border-sky-300',
+                                        default            => 'bg-rose-100 text-rose-800 border-rose-300',
+                                    };
+                                @endphp
+                                <tr class="perf-student-row hover:bg-[#F8FCFF] transition-colors"
+                                    data-student-name="{{ mb_strtolower($fullName) }}"
+                                    data-avg="{{ $avgScore !== null ? $avgScore : -1 }}"
+                                    data-quizzes="{{ $perf['quizzes_taken'] }}"
+                                    data-default-rank="{{ $idx }}">
+                                    <td class="py-3 px-3.5 whitespace-nowrap font-black text-xs">
+                                        {{ $rankBadge }}
+                                    </td>
+                                    <td class="py-3 px-3.5 whitespace-nowrap">
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="w-8 h-8 rounded-full bg-brand-coral text-white font-black text-xs flex items-center justify-center shrink-0">
+                                                {{ strtoupper(substr($fullName, 0, 1)) }}
+                                            </div>
+                                            <div>
+                                                <div class="font-black text-xs sm:text-sm text-brand-text">{{ $fullName }}</div>
+                                                <div class="text-[10px] font-extrabold text-slate-400">
+                                                    Level {{ $student->level ?? 1 }} &bull; {{ number_format($student->total_xp ?? 0) }} XP
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3.5 whitespace-nowrap">
+                                        @if($avgScore !== null)
+                                            <div class="flex flex-col gap-1">
+                                                <span class="inline-block w-fit px-2.5 py-0.5 rounded-lg border text-xs font-black {{ $overallBadgeClass }}">
+                                                    {{ $avgScore }}%
+                                                </span>
+                                                <div class="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                                    <div class="h-full rounded-full {{ $avgScore >= 85 ? 'bg-[#68CC18]' : ($avgScore >= 70 ? 'bg-[#0066D6]' : 'bg-rose-500') }}"
+                                                         style="width: {{ min(100, $avgScore) }}%;"></div>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <span class="px-2.5 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-extrabold text-slate-400">
+                                                No attempts
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-3.5 whitespace-nowrap text-xs font-extrabold text-slate-600">
+                                        {{ $perf['quizzes_taken'] }} / {{ $classQuizzes->count() }}
+                                    </td>
+                                    @foreach($classQuizzes as $quiz)
+                                        @php
+                                            $qData = $perf['per_quiz'][$quiz->id] ?? ['avg' => null, 'attempts' => 0];
+                                            $qAvg  = $qData['avg'];
+                                            $qPill = match(true) {
+                                                $qAvg === null => 'bg-slate-50 text-slate-400 border-slate-200',
+                                                $qAvg >= 85    => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                                $qAvg >= 70    => 'bg-sky-50 text-[#0066D6] border-sky-200',
+                                                default        => 'bg-amber-50 text-amber-800 border-amber-200',
+                                            };
+                                        @endphp
+                                        <td class="py-3 px-3.5 whitespace-nowrap">
+                                            @if($qAvg !== null)
+                                                <span class="inline-block px-2.5 py-0.5 rounded-lg border text-xs font-black {{ $qPill }}">
+                                                    {{ $qAvg }}%
+                                                </span>
+                                                <div class="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                    {{ $qData['attempts'] }} {{ \Illuminate\Support\Str::plural('try', $qData['attempts']) }}
+                                                </div>
+                                            @else
+                                                <span class="text-xs font-bold text-slate-300">&mdash;</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="py-10 text-center text-xs sm:text-sm font-extrabold text-slate-400">
+                        No students are enrolled in this class yet.
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <!-- 📚 CREATE MODULE SECTION MODAL -->
     <div id="create-module-section-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
         <div class="card-tactile max-w-lg w-full bg-white border-4 border-[#1DC4DF] shadow-2xl p-5 sm:p-6 relative">
@@ -1040,6 +1374,53 @@
 </div>
 
 <script>
+    function openStudentPerformanceModal() {
+        const modal = document.getElementById('student-performance-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeStudentPerformanceModal() {
+        const modal = document.getElementById('student-performance-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function filterAndSortPerformanceTable() {
+        const tbody = document.getElementById('perfTableBody');
+        if (!tbody) return;
+
+        const query = (document.getElementById('perfSearchInput')?.value || '').trim().toLowerCase();
+        const sortBy = document.getElementById('perfSortSelect')?.value || 'highest';
+        const rows = Array.from(tbody.querySelectorAll('.perf-student-row'));
+
+        rows.sort((a, b) => {
+            if (sortBy === 'name') {
+                return (a.dataset.studentName || '').localeCompare(b.dataset.studentName || '');
+            }
+            if (sortBy === 'quizzes') {
+                return parseFloat(b.dataset.quizzes || '0') - parseFloat(a.dataset.quizzes || '0');
+            }
+            if (sortBy === 'lowest') {
+                const aAvg = parseFloat(a.dataset.avg);
+                const bAvg = parseFloat(b.dataset.avg);
+                if (aAvg < 0 && bAvg < 0) return 0;
+                if (aAvg < 0) return 1;
+                if (bAvg < 0) return -1;
+                return aAvg - bAvg;
+            }
+            return parseInt(a.dataset.defaultRank || '0', 10) - parseInt(b.dataset.defaultRank || '0', 10);
+        });
+
+        rows.forEach(row => {
+            const name = row.dataset.studentName || '';
+            row.style.display = name.includes(query) ? '' : 'none';
+            tbody.appendChild(row);
+        });
+    }
+
     function openCreateModuleModal() {
         const modal = document.getElementById('create-module-section-modal');
         if (!modal) return;
@@ -1252,10 +1633,15 @@
         if (e.target.id === 'create-module-section-modal') closeCreateModuleModal();
     });
 
+    document.getElementById('student-performance-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'student-performance-modal') closeStudentPerformanceModal();
+    });
+
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeMediaModal();
             closeCreateModuleModal();
+            closeStudentPerformanceModal();
         }
     });
 </script>
