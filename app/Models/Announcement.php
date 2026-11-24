@@ -22,6 +22,7 @@ class Announcement extends Model
         'module_id',
         'due_at',
         'points',
+        'module_section_id',
     ];
 
     protected $casts = [
@@ -116,5 +117,26 @@ class Announcement extends Model
             'label' => 'Due in ' . $diff,
             'state' => $hoursLeft <= 24 ? 'urgent' : 'upcoming',
         ];
+    }
+
+    // Inside class Announcement extends Model:
+    protected static function booted(): void
+    {
+        static::creating(function (Announcement $announcement) {
+            if (empty($announcement->module_section_id) && request()->filled('module_section_id')) {$sectionId = (int) request()->input('module_section_id');
+                $belongsToClass = \App\Models\ModuleSection::where('id',$sectionId)
+                    ->where('class_id', $announcement->class_id)
+                    ->exists();
+
+                if ($belongsToClass) {
+                    $announcement->module_section_id =$sectionId;
+                }
+            }
+        });
+    }
+
+    public function moduleSection()
+    {
+        return $this->belongsTo(\App\Models\ModuleSection::class, 'module_section_id');
     }
 }

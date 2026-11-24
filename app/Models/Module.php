@@ -19,6 +19,7 @@ class Module extends Model
         'file_path',
         'file_type',
         'file_size',
+        'module_section_id',
     ];
 
     /**
@@ -47,5 +48,26 @@ class Module extends Model
     public function section(): BelongsTo
     {
         return $this->belongsTo(ModuleSection::class, 'module_section_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Module $module) {
+            if (empty($module->module_section_id) && request()->filled('module_section_id')) {
+                $sectionId = (int) request()->input('module_section_id');
+                $belongsToClass = \App\Models\ModuleSection::where('id', $sectionId)
+                    ->where('class_id', $module->class_id)
+                    ->exists();
+
+                if ($belongsToClass) {
+                    $module->module_section_id = $sectionId;
+                }
+            }
+        });
+    }
+
+    public function moduleSection()
+    {
+        return $this->belongsTo(\App\Models\ModuleSection::class, 'module_section_id');
     }
 }

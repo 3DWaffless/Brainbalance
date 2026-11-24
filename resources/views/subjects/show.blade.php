@@ -42,12 +42,16 @@
         : collect();
 
     // Separate unassigned stream posts & files from those organized inside a Module Section
+    // Checks both announcement.module_section_id and linked module.module_section_id
     $generalAnnouncements = $classroom->announcements
-        ->filter(fn ($p) => empty($p->module_section_id))
+        ->filter(function ($p) {
+            $secId = (int) ($p->module_section_id ?? ($p->module->module_section_id ?? 0));
+            return $secId === 0;
+        })
         ->sortByDesc('created_at');
 
     $generalLegacyModules = $legacyModules
-        ->filter(fn ($m) => empty($m->module_section_id));
+        ->filter(fn ($m) => (int) ($m->module_section_id ?? 0) === 0);
 
     // Teacher Student Performance Metrics (Top 3 + Per-Quiz Average % Breakdown)
     $classQuizzes = isset($classroom->quizzes) ? $classroom->quizzes : collect();
@@ -308,10 +312,13 @@
 
                     <!-- Target Module Section Picker -->
                     <div class="mb-3">
-                        <label class="block text-[11px] font-black text-[#0E7490] uppercase mb-1">
-                            📚 Module Section (Separate your notes &amp; files per module)
-                        </label>
-                        <select name="module_section_id" id="field-module-section"
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <label class="block text-[11px] font-black text-[#0E7490] uppercase">
+                                📚 Module Section (Files &amp; posts appear inside the selected module)
+                            </label>
+                            <span id="selectedModuleBadge" class="hidden px-2.5 py-0.5 rounded-full bg-[#0E7490] text-white font-black text-[10px]"></span>
+                        </div>
+                        <select name="module_section_id" id="field-module-section" onchange="updateSelectedModuleBanner()"
                                 class="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#99E2F5] bg-white font-extrabold text-sm text-brand-text focus:outline-none focus:border-[#0066D6]">
                             <option value="">General Class Stream (Not inside a specific module)</option>
                             @foreach($moduleSections as $idx => $sec)
@@ -413,14 +420,17 @@
                 <div class="mb-7 space-y-5">
                     <div class="flex items-center justify-between">
                         <h4 class="font-display font-bold text-base text-brand-text flex items-center gap-2">
-                            <span>📚 Learning Modules &amp; Teacher Notes</span>
+                            <span>📚 Learning Modules &amp; Uploaded Materials</span>
                         </h4>
                     </div>
 
                     @foreach($moduleSections as $secIdx => $section)
                         @php
                             $sectionPosts = $classroom->announcements
-                                ->filter(fn ($p) => (int) ($p->module_section_id ?? 0) === (int) $section->id)
+                                ->filter(function ($p) use ($section) {
+                                    $secId = (int) ($p->module_section_id ?? ($p->module->module_section_id ?? 0));
+                                    return $secId === (int) $section->id;
+                                })
                                 ->sortBy('created_at');
 
                             $sectionLegacyModules = $legacyModules
@@ -510,11 +520,22 @@
                                 <div class="space-y-3">
                                     @foreach($sectionPosts as $post)
                                         @php
-                                            $postType = $post->type ?? 'text';
-                                            $ext = strtolower($post->file_type ?? pathinfo((string) $post->file_name, PATHINFO_EXTENSION));
-                                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
-                                            $isAudio = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
-                                            $isPdf   = $ext === 'pdf';
+                                            $postType      = $post->type ?? 'text';
+                                            $filePath      = $post->file_path ?: ($post->module->file_path ?? null);
+                                            $fileName      = $post->file_name ?: ($post->module->file_name ?? ($post->title ?? 'Attached File'));
+                                            $ext           = strtolower($post->file_type ?? ($post->module->file_type ?? pathinfo((string) $fileName, PATHINFO_EXTENSION)));
+                                            $formattedSize = $post->formatted_size ?? ($post->module->formatted_size ?? null);
+                                            $viewUrl       = $post->file_path
+                                                ? route('announcements.view', $post->id)
+                                                : ($post->module_id ? route('modules.view', $post->module_id) : null);
+                                            $downloadUrl   = $post->file_path
+                                                ? route('announcements.download', $post->id)
+                                                : ($post->module_id ? route('modules.download', $post->module_id) : null);
+
+                                            $isImage     = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
+                                            $isVideoFile = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv']);
+                                            $isAudio     = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
+                                            $isPdf       = $ext === 'pdf';
                                         @endphp
                                         <div class="bg-white border-2 border-[#B8E2F8] rounded-2xl p-3.5">
                                             <div class="flex items-start justify-between gap-2 mb-1.5">
@@ -540,30 +561,39 @@
                                                 <p class="font-bold text-xs sm:text-sm text-slate-600 whitespace-pre-line mb-2.5">{{ $post->content }}</p>
                                             @endif
 
-                                            @if($post->file_path)
-                                                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                                                    <span class="text-xs font-extrabold text-slate-500 truncate">
-                                                        📎 {{ $post->file_name }}
-                                                    </span>
-                                                    <div class="flex flex-wrap items-center gap-2">
-                                                        @if($isImage)
-                                                            <button type="button" onclick="openMediaModal('image', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
-                                                                🖼️ View
-                                                            </button>
-                                                        @elseif($isAudio)
-                                                            <button type="button" onclick="openMediaModal('audio', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
-                                                                🎧 Listen
-                                                            </button>
-                                                        @elseif($isPdf && $post->module_id)
-                                                            <a href="{{ route('modules.read', $post->module_id) }}" class="btn-tactile-teal text-xs py-1 px-3">
-                                                                📕 Read Lesson
-                                                            </a>
-                                                        @endif
-                                                        <a href="{{ route('announcements.download', $post->id) }}" class="btn-tactile-ghost text-xs py-1 px-3">
-                                                            ⬇️ Download
-                                                        </a>
+                                            @if($postType === 'video')
+                                                @if($filePath && $isVideoFile && $viewUrl)
+                                                    @php
+                                                        $videoMime = match($ext) {
+                                                            'webm' => 'video/webm',
+                                                            'ogg'  => 'video/ogg',
+                                                            default => 'video/mp4',
+                                                        };
+                                                    @endphp
+                                                    <div class="bg-black rounded-2xl overflow-hidden border-2 border-[#99E2F5] mb-2">
+                                                        <video controls playsinline preload="metadata" class="w-full max-h-[360px]">
+                                                            <source src="{{ $viewUrl }}" type="{{ $videoMime }}">
+                                                        </video>
                                                     </div>
-                                                </div>
+                                                    @if($downloadUrl)
+                                                        <div class="flex justify-end">
+                                                            <a href="{{ $downloadUrl }}" class="btn-tactile-ghost text-xs py-1 px-3">⬇️ Download Video</a>
+                                                        </div>
+                                                    @endif
+                                                @elseif($post->embed_video_url || $post->video_url)
+                                                    @php
+                                                        $rawUrl = trim((string) ($post->embed_video_url ?: $post->video_url));
+                                                        $embedUrl = $rawUrl;
+                                                        if (preg_match('~(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})~', $rawUrl, $m)) {
+                                                            $embedUrl = 'https://www.youtube.com/embed/' . $m[1];
+                                                        } elseif (preg_match('~drive\.google\.com/file/d/([^/]+)~', $rawUrl, $m)) {
+                                                            $embedUrl = 'https://drive.google.com/file/d/' . $m[1] . '/preview';
+                                                        }
+                                                    @endphp
+                                                    <div class="relative w-full overflow-hidden rounded-2xl border-2 border-[#99E2F5] bg-black" style="padding-top: 56.25%;">
+                                                        <iframe src="{{ $embedUrl }}" class="absolute inset-0 w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                                    </div>
+                                                @endif
                                             @elseif($postType === 'quiz' && $post->quiz)
                                                 <div class="pt-1 flex justify-end">
                                                     <a href="{{ route('quiz.show', $post->quiz->id) }}" class="btn-tactile-teal text-xs py-1.5 px-3.5">
@@ -571,13 +601,58 @@
                                                     </a>
                                                 </div>
                                             @elseif($postType === 'assignment')
-                                                <div class="pt-1 flex justify-between items-center">
-                                                    <span class="text-xs font-extrabold text-amber-700">
-                                                        @if($post->due_at) Due {{ $post->due_at->format('M d, Y • h:i A') }} @endif
-                                                    </span>
-                                                    @if(Auth::user()->isStudent())
-                                                        <a href="{{ route('assignments.index') }}" class="btn-tactile-primary text-xs py-1.5 px-3.5">📤 Turn In</a>
+                                                <div class="pt-1 space-y-2">
+                                                    @if($filePath && $downloadUrl)
+                                                        <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-[#0066D6] font-black text-xs hover:bg-sky-100">
+                                                            📎 Worksheet: {{ $fileName }}
+                                                        </a>
                                                     @endif
+                                                    <div class="flex justify-between items-center">
+                                                        <span class="text-xs font-extrabold text-amber-700">
+                                                            @if($post->due_at) Due {{ $post->due_at->format('M d, Y • h:i A') }} @endif
+                                                        </span>
+                                                        @if(Auth::user()->isStudent())
+                                                            <a href="{{ route('assignments.index') }}" class="btn-tactile-primary text-xs py-1.5 px-3.5">📤 Turn In</a>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @elseif($filePath)
+                                                <div class="bg-[#F4FAFF] border border-[#B8E2F8] rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2">
+                                                    <div class="flex items-center gap-2.5 min-w-0">
+                                                        <span class="text-lg shrink-0">
+                                                            {{ $isImage ? '🖼️' : ($isAudio ? '🎧' : ($isPdf ? '📕' : '📄')) }}
+                                                        </span>
+                                                        <div class="min-w-0">
+                                                            <div class="text-xs font-black text-brand-text truncate">{{ $fileName }}</div>
+                                                            <div class="text-[10px] font-bold text-slate-400">
+                                                                {{ strtoupper($ext ?: 'FILE') }} @if($formattedSize) &bull; {{ $formattedSize }} @endif
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        @if($isImage && $viewUrl)
+                                                            <button type="button" onclick="openMediaModal('image', '{{ $viewUrl }}', '{{ addslashes($post->title ?? $fileName) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
+                                                                🖼️ View
+                                                            </button>
+                                                        @elseif($isAudio && $viewUrl)
+                                                            <button type="button" onclick="openMediaModal('audio', '{{ $viewUrl }}', '{{ addslashes($post->title ?? $fileName) }}')" class="btn-tactile-teal text-xs py-1 px-3 cursor-pointer">
+                                                                🎧 Listen
+                                                            </button>
+                                                        @elseif($isPdf && $post->module_id)
+                                                            <a href="{{ route('modules.read', $post->module_id) }}" class="btn-tactile-teal text-xs py-1 px-3">
+                                                                📕 Read Lesson
+                                                            </a>
+                                                        @elseif($isPdf && $viewUrl)
+                                                            <a href="{{ $viewUrl }}" target="_blank" class="btn-tactile-teal text-xs py-1 px-3">
+                                                                📕 Open PDF
+                                                            </a>
+                                                        @endif
+                                                        @if($downloadUrl)
+                                                            <a href="{{ $downloadUrl }}" class="btn-tactile-ghost text-xs py-1 px-3">
+                                                                ⬇️ Download
+                                                            </a>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             @endif
                                         </div>
@@ -657,11 +732,21 @@
                                 'assignment' => ['icon' => '📝', 'label' => 'Assignment', 'bg' => 'bg-amber-100 text-[#C2410C] border-amber-300'],
                                 default      => ['icon' => '💬', 'label' => 'Announcement', 'bg' => 'bg-slate-100 text-slate-700 border-slate-200'],
                             };
-                            $ext = strtolower($post->file_type ?? pathinfo((string) $post->file_name, PATHINFO_EXTENSION));
-                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
+                            $filePath      = $post->file_path ?: ($post->module->file_path ?? null);
+                            $fileName      = $post->file_name ?: ($post->module->file_name ?? ($post->title ?? 'Attached File'));
+                            $ext           = strtolower($post->file_type ?? ($post->module->file_type ?? pathinfo((string) $fileName, PATHINFO_EXTENSION)));
+                            $formattedSize = $post->formatted_size ?? ($post->module->formatted_size ?? null);
+                            $viewUrl       = $post->file_path
+                                ? route('announcements.view', $post->id)
+                                : ($post->module_id ? route('modules.view', $post->module_id) : null);
+                            $downloadUrl   = $post->file_path
+                                ? route('announcements.download', $post->id)
+                                : ($post->module_id ? route('modules.download', $post->module_id) : null);
+
+                            $isImage     = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']);
                             $isVideoFile = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv']);
-                            $isAudio = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
-                            $isPdf = $ext === 'pdf';
+                            $isAudio     = in_array($ext, ['mp3', 'wav', 'm4a', 'aac', 'flac']);
+                            $isPdf       = $ext === 'pdf';
                         @endphp
 
                         <div class="stream-post-card bg-brand-bg border-3 {{ $postType === 'assignment' ? 'border-[#FDBA74]' : 'border-brand-border' }} rounded-2xl p-4 md:p-5"
@@ -711,27 +796,27 @@
                             @endif
 
                             <!-- TYPE: FILE MATERIAL -->
-                            @if($postType === 'file' && $post->file_path)
+                            @if($postType === 'file' && $filePath)
                                 <div class="bg-white border-2 border-[#B8E2F8] rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                     <div class="flex items-center gap-3">
                                         <div class="w-11 h-11 rounded-xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center text-xl shrink-0">
                                             {{ $isImage ? '🖼️' : ($isAudio ? '🎧' : ($isPdf ? '📕' : '📄')) }}
                                         </div>
                                         <div>
-                                            <div class="font-black text-xs sm:text-sm text-brand-text">{{ $post->file_name }}</div>
+                                            <div class="font-black text-xs sm:text-sm text-brand-text">{{ $fileName }}</div>
                                             <div class="text-[11px] font-bold text-slate-400">
-                                                {{ strtoupper($ext ?: 'FILE') }} @if($post->formatted_size) &bull; {{ $post->formatted_size }} @endif
+                                                {{ strtoupper($ext ?: 'FILE') }} @if($formattedSize) &bull; {{ $formattedSize }} @endif
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                                        @if($isImage)
-                                            <button type="button" onclick="openMediaModal('image', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
+                                        @if($isImage && $viewUrl)
+                                            <button type="button" onclick="openMediaModal('image', '{{ $viewUrl }}', '{{ addslashes($post->title ?? $fileName) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
                                                 🖼️ View Photo
                                             </button>
-                                        @elseif($isAudio)
-                                            <button type="button" onclick="openMediaModal('audio', '{{ route('announcements.view', $post->id) }}', '{{ addslashes($post->title ?? $post->file_name) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
+                                        @elseif($isAudio && $viewUrl)
+                                            <button type="button" onclick="openMediaModal('audio', '{{ $viewUrl }}', '{{ addslashes($post->title ?? $fileName) }}')" class="btn-tactile-teal text-xs py-1.5 px-3 cursor-pointer">
                                                 🎧 Listen
                                             </button>
                                         @elseif($isPdf && $post->module_id)
@@ -739,16 +824,18 @@
                                                 📕 Read Lesson
                                             </a>
                                         @endif
-                                        <a href="{{ route('announcements.download', $post->id) }}" class="btn-tactile-ghost text-xs py-1.5 px-3">
-                                            ⬇️ Download
-                                        </a>
+                                        @if($downloadUrl)
+                                            <a href="{{ $downloadUrl }}" class="btn-tactile-ghost text-xs py-1.5 px-3">
+                                                ⬇️ Download
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
                             @endif
 
                             <!-- TYPE: VIDEO LESSON -->
                             @if($postType === 'video')
-                                @if($post->file_path && $isVideoFile)
+                                @if($filePath && $isVideoFile && $viewUrl)
                                     @php
                                         $videoMime = match($ext) {
                                             'webm' => 'video/webm',
@@ -758,15 +845,17 @@
                                     @endphp
                                     <div class="bg-black rounded-2xl overflow-hidden border-2 border-[#99E2F5] mb-2">
                                         <video controls playsinline preload="metadata" class="w-full max-h-[420px]">
-                                            <source src="{{ route('announcements.view', $post->id) }}" type="{{ $videoMime }}">
+                                            <source src="{{ $viewUrl }}" type="{{ $videoMime }}">
                                             Your browser does not support the video tag.
                                         </video>
                                     </div>
-                                    <div class="flex justify-end">
-                                        <a href="{{ route('announcements.download', $post->id) }}" class="btn-tactile-ghost text-xs py-1.5 px-3">
-                                            ⬇️ Download Video
-                                        </a>
-                                    </div>
+                                    @if($downloadUrl)
+                                        <div class="flex justify-end">
+                                            <a href="{{ $downloadUrl }}" class="btn-tactile-ghost text-xs py-1.5 px-3">
+                                                ⬇️ Download Video
+                                            </a>
+                                        </div>
+                                    @endif
                                 @elseif($post->embed_video_url || $post->video_url)
                                     @php
                                         $rawUrl = trim((string) ($post->embed_video_url ?: $post->video_url));
@@ -850,10 +939,10 @@
                                         </span>
                                     </div>
 
-                                    @if($post->file_path)
+                                    @if($filePath && $downloadUrl)
                                         <div>
-                                            <a href="{{ route('announcements.download', $post->id) }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-[#0066D6] font-black text-xs hover:bg-sky-100">
-                                                📎 Download Worksheet: {{ $post->file_name }}
+                                            <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-[#0066D6] font-black text-xs hover:bg-sky-100">
+                                                📎 Download Worksheet: {{ $fileName }}
                                             </a>
                                         </div>
                                     @endif
@@ -1155,7 +1244,6 @@
     <!-- 📊 IN-DEPTH STUDENT PERFORMANCE MODAL -->
     <div id="student-performance-modal" class="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 hidden items-center justify-center p-3 sm:p-5">
         <div class="card-tactile max-w-5xl w-full max-h-[90vh] flex flex-col bg-white border-4 border-[#0066D6] shadow-2xl p-4 sm:p-6 relative">
-            <!-- Modal Header -->
             <div class="flex items-start justify-between gap-3 pb-3 mb-4 border-b-4 border-dashed border-brand-border shrink-0">
                 <div>
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E0F7FC] text-[#0066D6] border border-[#B3E5FC] font-black text-[10px] uppercase tracking-wider mb-1">
@@ -1174,7 +1262,6 @@
                 </button>
             </div>
 
-            <!-- Summary KPI Strip -->
             <div class="grid grid-cols-3 gap-3 mb-4 shrink-0">
                 <div class="p-3 rounded-2xl bg-[#F2FAFF] border-2 border-[#B8E2F8]">
                     <div class="text-[10px] font-black uppercase text-slate-500">Class Quiz Average</div>
@@ -1196,7 +1283,6 @@
                 </div>
             </div>
 
-            <!-- Search & Sort Controls -->
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3 shrink-0">
                 <input type="text"
                        id="perfSearchInput"
@@ -1214,7 +1300,6 @@
                 </select>
             </div>
 
-            <!-- Scrollable Per-Quiz Student Performance Table -->
             <div class="overflow-auto rounded-2xl border-3 border-[#B8E2F8] flex-1">
                 @if($classroom->students->count() > 0)
                     <table class="w-full text-left border-collapse text-xs sm:text-sm">
@@ -1435,10 +1520,25 @@
         modal.classList.remove('flex');
     }
 
+    function updateSelectedModuleBanner() {
+        const select = document.getElementById('field-module-section');
+        const badge = document.getElementById('selectedModuleBadge');
+        if (!select || !badge) return;
+
+        if (select.value) {
+            const label = select.options[select.selectedIndex]?.text || 'Module';
+            badge.textContent = 'Posting into: ' + label;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
     function preparePostInModule(sectionId, postType = 'file') {
         const select = document.getElementById('field-module-section');
         if (select) {
             select.value = String(sectionId);
+            updateSelectedModuleBanner();
         }
         selectPostType(postType);
         const form = document.getElementById('classPostComposerForm');
@@ -1549,6 +1649,7 @@
         if (document.getElementById('postTypeInput')) {
             selectPostType(initialType);
         }
+        updateSelectedModuleBanner();
     });
 
     function copyClassCode() {
