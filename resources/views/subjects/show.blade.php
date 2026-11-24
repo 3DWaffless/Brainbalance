@@ -622,7 +622,7 @@
         <div class="card-tactile">
             <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
                 <h3 class="font-display text-lg font-bold text-brand-text">
-                    {{ Auth::user()->isStudent() ? '⚔️ Quiz Quests' : '📝 Class Quizzes' }}
+                    {{ Auth::user()->isStudent() ? 'Quizzes' : 'Quizzes' }}
                 </h3>
                 @if(Auth::user()->isTeacher() || Auth::user()->role === 'admin')
                     <a href="{{ route('quiz.create', ['class_id' => $classroom->id]) }}" class="btn-tactile-primary text-xs py-1.5 px-3">
