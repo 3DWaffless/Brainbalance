@@ -691,7 +691,7 @@
         <!-- ENROLLED STUDENTS ROSTER -->
         <div class="card-tactile">
             <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
-                <h3 class="font-display text-lg font-bold text-brand-text">👥 Class Explorers</h3>
+                <h3 class="font-display text-lg font-bold text-brand-text">Students</h3>
                 <span class="bg-brand-teal text-white font-black text-xs px-2.5 py-1 rounded-full">
                     {{ $classroom->students->count() }}
                 </span>
