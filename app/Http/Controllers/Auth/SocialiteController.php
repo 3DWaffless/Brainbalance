@@ -152,7 +152,10 @@ class SocialiteController extends Controller
         $avatarUrl = $googleData['avatar'] ?? null;
 
         if ($request->hasFile('avatar')) {
-            $avatarUrl = $this->uploadAvatar($request->file('avatar'));
+            $uploadedUrl = $this->uploadAvatar($request->file('avatar'));
+            if (!empty($uploadedUrl)) {
+                $avatarUrl = $uploadedUrl;
+            }
         }
 
         $user = new User();
@@ -174,6 +177,9 @@ class SocialiteController extends Controller
         if (Schema::hasColumn('users', 'avatar_url')) {
             $user->avatar_url = $avatarUrl;
         }
+        if (Schema::hasColumn('users', 'avatar')) {
+            $user->avatar = $avatarUrl;
+        }
         if (Schema::hasColumn('users', 'google_id')) {
             $user->google_id = $googleData['google_id'];
         }
@@ -192,22 +198,43 @@ class SocialiteController extends Controller
 
     protected function uploadAvatar($file): ?string
     {
-        $supabaseUrl = rtrim((string) config('services.supabase.url', env('SUPABASE_URL', '')), '/');
-        $serviceKey  = (string) config('services.supabase.service_role_key', env('SUPABASE_SERVICE_ROLE_KEY', ''));
+        $supabaseUrl = rtrim(trim((string) (config('services.supabase.url') ?: env('SUPABASE_URL', '')), " \t\n\r\0\x0B\"'"), '/');
+        $serviceKey  = trim((string) (config('services.supabase.service_role_key') ?: env('SUPABASE_SERVICE_ROLE_KEY', '')), " \t\n\r\0\x0B\"'");
+        $bucket      = trim((string) (config('filesystems.disks.s3.bucket') ?: config('services.supabase.bucket') ?: env('AWS_BUCKET') ?: 'brainbalance-files'), " \t\n\r\0\x0B\"'/");
+
+        if ($bucket === '') {
+            $bucket = 'brainbalance-files';
+        }
 
         if ($supabaseUrl !== '' && $serviceKey !== '') {
-            $fileName = 'avatar_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $uploadUrl = "{$supabaseUrl}/storage/v1/object/avatars/{$fileName}";
+            $extension  = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+            $fileName   = 'avatar_' . Str::uuid() . '.' . $extension;
+            $objectPath = "avatars/{$fileName}";
+            $uploadUrl  = "{$supabaseUrl}/storage/v1/object/{$bucket}/{$objectPath}";
 
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $serviceKey,
-                'apikey'        => $serviceKey,
-                'Content-Type'  => $file->getMimeType(),
-            ])->withBody(file_get_contents($file->getRealPath()), $file->getMimeType())->post($uploadUrl);
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $serviceKey,
+                    'apikey'        => $serviceKey,
+                    'Content-Type'  => $file->getMimeType() ?: 'application/octet-stream',
+                    'x-upsert'      => 'true',
+                ])->withBody(file_get_contents($file->getRealPath()), $file->getMimeType() ?: 'application/octet-stream')
+                  ->post($uploadUrl);
 
-            if ($response->successful()) {
-                return "{$supabaseUrl}/storage/v1/object/public/avatars/{$fileName}";
+                if ($response->successful()) {
+                    return "{$supabaseUrl}/storage/v1/object/public/{$bucket}/{$objectPath}";
+                }
+
+                Log::error('Supabase Google signup avatar upload failed', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                    'url'    => $uploadUrl,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Supabase Google signup avatar upload exception: ' . $e->getMessage());
             }
+        } else {
+            Log::warning('Supabase credentials missing during Google signup avatar upload.');
         }
 
         $path = $file->store('avatars', 'public');
