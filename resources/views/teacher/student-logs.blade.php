@@ -4,57 +4,9 @@
 @section('title', 'Student Activity Logs - BrainBalance')
 
 @section('content')
-<!-- Top Navigation Bar Div -->
-<div class="bg-white/95 backdrop-blur-xs border-b-4 border-[#B3E5FC] shadow-[0_4px_0_#D4F1FC] sticky top-0 z-30">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
-                <span class="w-9 h-9 rounded-xl bg-[#0066D6] text-white font-black text-base flex items-center justify-center shadow-[0_3px_0_#004FA8] group-hover:scale-105 transition-transform">
-                    🧠
-                </span>
-                <span class="font-display font-black text-lg text-[#0D2B4E] tracking-tight">
-                    BrainBalance
-                </span>
-            </a>
-        </div>
-
-        <nav class="hidden md:flex items-center gap-2">
-            <a href="{{ route('dashboard') }}"
-               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
-                🏠 Dashboard
-            </a>
-            <a href="{{ route('subjects.index') }}"
-               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
-                🏫 My Classrooms
-            </a>
-            <a href="{{ route('quiz.index') }}"
-               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
-                🧩 Quizzes
-            </a>
-            <a href="{{ route('teacher.student-logs.index') }}"
-               class="px-3.5 py-2 rounded-xl text-xs font-black bg-[#E0F7FC] text-[#0066D6] border-2 border-[#B3E5FC]">
-                📋 Student Logs
-            </a>
-        </nav>
-
-        <div class="flex items-center gap-2.5">
-            <a href="{{ route('dashboard') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F2FAFF] hover:bg-[#E0F2FE] text-[#0066D6] font-black text-xs border-2 border-[#B8E2F8] transition-colors">
-                &larr; Dashboard
-            </a>
-            @if (Route::has('profile.edit'))
-                <a href="{{ route('profile.edit') }}"
-                   class="w-9 h-9 rounded-full bg-[#0066D6] text-white font-black text-xs flex items-center justify-center border-2 border-[#B3E5FC]"
-                   title="Account Settings">
-                    {{ strtoupper(substr(auth()->user()->first_name ?? auth()->user()->name ?? 'T', 0, 1)) }}
-                </a>
-            @endif
-        </div>
-    </div>
-</div>
-
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <!-- Dashboard-Style Header Container -->
+    <div class="bg-gradient-to-r from-[#EBF7FF] via-white to-[#F2FAFF] border-4 border-[#B3E5FC] rounded-[28px] p-5 sm:p-6 shadow-[0_8px_0_#D4F1FC] mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[#E0F7FC] text-[#0066D6] border-2 border-[#B3E5FC] mb-2">
                 My Class Monitoring
@@ -65,7 +17,7 @@
             </p>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
             <a href="{{ route('teacher.student-logs.export', request()->query()) }}"
                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#68CC18] hover:bg-[#58B312] text-white font-black text-sm border-2 border-[#46910D] shadow-[0_4px_0_#46910D] whitespace-nowrap transition-all">
                 ⬇️ Export CSV
@@ -77,6 +29,7 @@
         </div>
     </div>
 
+    <!-- Summary Stat Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 shadow-[0_6px_0_#D4F1FC]">
             <div class="text-xs font-black uppercase text-[#5A7696]">My Enrolled Students</div>
@@ -100,6 +53,7 @@
         </div>
     </div>
 
+    <!-- Filter Bar -->
     <form method="GET" action="{{ route('teacher.student-logs.index') }}"
           class="bg-white border-[3px] border-[#B3E5FC] rounded-3xl p-4 sm:p-5 shadow-[0_6px_0_#D4F1FC] mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <div>
@@ -160,6 +114,7 @@
         </div>
     </form>
 
+    <!-- Activity Logs Table -->
     <div class="bg-white border-4 border-[#B3E5FC] rounded-[28px] overflow-hidden shadow-[0_10px_0_#D4F1FC]">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
