@@ -245,7 +245,6 @@
                     </div>
                 @else
                     <div class="text-center py-8 bg-brand-bg/60 rounded-2xl border-2 border-dashed border-brand-border">
-                        <div class="text-3xl mb-2">⚔️</div>
                         <p class="text-xs font-bold text-slate-400">No quizzes available right now.</p>
                     </div>
                 @endif
