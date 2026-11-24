@@ -88,17 +88,29 @@ class ClassroomController extends Controller
         // Generate a unique non-repeating class code
         do {
             $code = strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8));
-        } while (Classroom::where('class_code', $code)->exists());
+            $exists = Classroom::query()
+                ->when(Schema::hasColumn('classes', 'class_code'), fn ($q) => $q->orWhere('class_code', $code))
+                ->when(Schema::hasColumn('classes', 'code'), fn ($q) => $q->orWhere('code', $code))
+                ->exists();
+        } while ($exists);
 
-        Classroom::create([
+        $attributes = [
             'teacher_id' => Auth::id(),
-            'name' => $request->name,
-            'subject' => $request->subject,
-            'section' => $request->section,
-            'class_code' => $code,
-        ]);
+            'name' => trim($request->name),
+            'subject' => filled($request->subject) ? trim($request->subject) : null,
+            'section' => filled($request->section) ? trim($request->section) : null,
+        ];
 
-        return redirect()->route('subjects.index')->with('status', 'Classroom created successfully! Class Code: ' . $code);
+        if (Schema::hasColumn('classes', 'class_code')) {
+            $attributes['class_code'] = $code;
+        }
+        if (Schema::hasColumn('classes', 'code')) {
+            $attributes['code'] = $code;
+        }
+
+        Classroom::create($attributes);
+
+        return redirect()->route('subjects.index')->with('success', 'Classroom created successfully! Class Code: ' . $code);
     }
 
     public function join(Request $request)

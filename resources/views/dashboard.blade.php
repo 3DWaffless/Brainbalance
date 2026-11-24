@@ -22,7 +22,7 @@
                 <a href="{{ route('quiz.create') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
                     Create Quiz
                 </a>
-                <button type="button" onclick="document.getElementById('create-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2.5 px-4">
+                <button type="button" onclick="document.getElementById('create-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2.5 px-4 cursor-pointer">
                     Create Class
                 </button>
             </div>
@@ -65,7 +65,7 @@
                     <a href="{{ route('quiz.index') }}" class="btn-tactile-orange text-xs sm:text-sm py-3 px-5">
                         Take a Quiz
                     </a>
-                    <button type="button" onclick="document.getElementById('join-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs sm:text-sm py-3 px-5">
+                    <button type="button" onclick="document.getElementById('join-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs sm:text-sm py-3 px-5 cursor-pointer">
                         Join New Class
                     </button>
                 </div>
@@ -193,7 +193,7 @@
                             @endif
                         </p>
                         @if(!Auth::user()->isTeacher())
-                            <button type="button" onclick="document.getElementById('join-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2 px-4">
+                            <button type="button" onclick="document.getElementById('join-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2 px-4 cursor-pointer">
                                 🔑 Enter Class Code
                             </button>
                         @endif
@@ -259,7 +259,7 @@
         <div class="card-tactile max-w-md w-full bg-white border-4 border-brand-coral shadow-2xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
                 <h3 class="font-black text-base sm:text-lg text-brand-text">🏫 Create New Classroom</h3>
-                <button type="button" onclick="document.getElementById('create-class-modal')?.classList.add('hidden')" class="w-8 h-8 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">✕</button>
+                <button type="button" onclick="document.getElementById('create-class-modal')?.classList.add('hidden')" class="w-8 h-8 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer">✕</button>
             </div>
 
             <form action="{{ route('classes.store') }}" method="POST" class="flex flex-col gap-3.5">
@@ -280,7 +280,8 @@
                 </div>
 
                 <div class="pt-2 flex justify-end gap-2">
-                    <button type="button" onclick="document.getElementById('create-class-modal')?.classList.add('hidden')" class="btn-tactile-primary text-xs py-2 px-5">Create Class 🚀</button>
+                    <button type="button" onclick="document.getElementById('create-class-modal')?.classList.add('hidden')" class="btn-tactile-ghost text-xs py-2 px-4 cursor-pointer">Cancel</button>
+                    <button type="submit" class="btn-tactile-primary text-xs py-2 px-5 cursor-pointer">Create Class</button>
                 </div>
             </form>
         </div>
@@ -291,7 +292,7 @@
         <div class="card-tactile max-w-md w-full bg-white border-4 border-brand-teal shadow-2xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 pb-3 border-b-4 border-dashed border-brand-border">
                 <h3 class="font-display font-bold text-base sm:text-lg text-brand-text">🔑 Join a Subject World</h3>
-                <button type="button" onclick="document.getElementById('join-class-modal')?.classList.add('hidden')" class="w-8 h-8 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">✕</button>
+                <button type="button" onclick="document.getElementById('join-class-modal')?.classList.add('hidden')" class="w-8 h-8 rounded-full bg-brand-coral text-white font-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer">✕</button>
             </div>
 
             <form action="{{ route('classes.join') }}" method="POST" class="flex flex-col gap-3.5">
@@ -302,7 +303,7 @@
                 </div>
 
                 <div class="pt-2 flex justify-end gap-2">
-                    <button type="submit" class="btn-tactile-teal text-xs py-2.5 px-5 w-full">Unlock Classroom 🚀</button>
+                    <button type="submit" class="btn-tactile-teal text-xs py-2.5 px-5 w-full cursor-pointer">Unlock Classroom</button>
                 </div>
             </form>
         </div>
