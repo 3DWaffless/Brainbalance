@@ -1,9 +1,60 @@
 {{-- FILE: resources/views/teacher/student-logs.blade.php --}}
 @extends('layouts.app')
 
+@section('title', 'Student Activity Logs - BrainBalance')
+
 @section('content')
+<!-- Top Navigation Bar Div -->
+<div class="bg-white/95 backdrop-blur-xs border-b-4 border-[#B3E5FC] shadow-[0_4px_0_#D4F1FC] sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
+                <span class="w-9 h-9 rounded-xl bg-[#0066D6] text-white font-black text-base flex items-center justify-center shadow-[0_3px_0_#004FA8] group-hover:scale-105 transition-transform">
+                    🧠
+                </span>
+                <span class="font-display font-black text-lg text-[#0D2B4E] tracking-tight">
+                    BrainBalance
+                </span>
+            </a>
+        </div>
+
+        <nav class="hidden md:flex items-center gap-2">
+            <a href="{{ route('dashboard') }}"
+               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
+                🏠 Dashboard
+            </a>
+            <a href="{{ route('subjects.index') }}"
+               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
+                🏫 My Classrooms
+            </a>
+            <a href="{{ route('quiz.index') }}"
+               class="px-3.5 py-2 rounded-xl text-xs font-black text-[#3E5A7A] hover:bg-[#F2FAFF] hover:text-[#0066D6] transition-colors">
+                🧩 Quizzes
+            </a>
+            <a href="{{ route('teacher.student-logs.index') }}"
+               class="px-3.5 py-2 rounded-xl text-xs font-black bg-[#E0F7FC] text-[#0066D6] border-2 border-[#B3E5FC]">
+                📋 Student Logs
+            </a>
+        </nav>
+
+        <div class="flex items-center gap-2.5">
+            <a href="{{ route('dashboard') }}"
+               class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F2FAFF] hover:bg-[#E0F2FE] text-[#0066D6] font-black text-xs border-2 border-[#B8E2F8] transition-colors">
+                &larr; Dashboard
+            </a>
+            @if (Route::has('profile.edit'))
+                <a href="{{ route('profile.edit') }}"
+                   class="w-9 h-9 rounded-full bg-[#0066D6] text-white font-black text-xs flex items-center justify-center border-2 border-[#B3E5FC]"
+                   title="Account Settings">
+                    {{ strtoupper(substr(auth()->user()->first_name ?? auth()->user()->name ?? 'T', 0, 1)) }}
+                </a>
+            @endif
+        </div>
+    </div>
+</div>
+
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[#E0F7FC] text-[#0066D6] border-2 border-[#B3E5FC] mb-2">
                 My Class Monitoring
@@ -13,13 +64,14 @@
                 Showing activity for students enrolled in your classes when opening class files, submitting assignments, or taking class quizzes.
             </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2.5">
+
+        <div class="flex items-center gap-2.5 shrink-0">
             <a href="{{ route('teacher.student-logs.export', request()->query()) }}"
-               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#68CC18] hover:bg-[#58B312] text-white font-black text-sm border-2 border-[#46910D] shadow-[0_4px_0_#46910D] transition-all">
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#68CC18] hover:bg-[#58B312] text-white font-black text-sm border-2 border-[#46910D] shadow-[0_4px_0_#46910D] whitespace-nowrap transition-all">
                 ⬇️ Export CSV
             </a>
             <a href="{{ route('subjects.index') }}"
-               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white hover:bg-[#F2FAFF] text-[#0D2B4E] font-extrabold text-sm border-[3px] border-[#B8E2F8] shadow-[0_4px_0_#D4F1FC] transition-all">
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white hover:bg-[#F2FAFF] text-[#0D2B4E] font-extrabold text-sm border-[3px] border-[#B8E2F8] shadow-[0_4px_0_#D4F1FC] whitespace-nowrap transition-all">
                 🏫 My Classrooms
             </a>
         </div>
