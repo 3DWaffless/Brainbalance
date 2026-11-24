@@ -234,8 +234,8 @@
                         </a>
                     @elseif($isStudent)
                         <a href="{{ route('dashboard') }}" class="bb-sidebar-link {{ request()->routeIs('dashboard') ? 'bb-nav-active-blue' : '' }}">
-                            <span class="text-lg">🚀</span>
-                            Adventure Hub
+                            <span class="text-lg">🏫</span>
+                            Dashboard
                         </a>
                         <a href="{{ route('subjects.index') }}" class="bb-sidebar-link {{ request()->routeIs('subjects.*') ? 'bb-nav-active-lime' : '' }}">
                             <span class="text-lg">📚</span>
@@ -251,8 +251,8 @@
                             @endif
                         </a>
                         <a href="{{ route('quiz.index') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.index') || request()->routeIs('quiz.show') ? 'bb-nav-active-orange' : '' }}">
-                            <span class="text-lg">⚔️</span>
-                            Quiz Quests
+                            <span class="text-lg">📓</span>
+                            Quizzes
                         </a>
                         @if(\Illuminate\Support\Facades\Route::has('quiz.history'))
                             <a href="{{ route('quiz.history') }}" class="bb-sidebar-link {{ request()->routeIs('quiz.history') || request()->routeIs('quiz.review') ? 'bb-nav-active-cyan' : '' }}">
