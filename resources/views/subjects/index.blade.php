@@ -57,14 +57,6 @@
                         'pillBg'   => 'bg-lime-600 text-white border-lime-700',
                         'emoji'    => '📖',
                         'btn'      => 'btn-tactile-teal',
-                    ],
-                    $isScience => [
-                        'headerBg' => 'linear-gradient(135deg, #F3E8FF 0%, #FAF5FF 100%)',
-                        'border'   => 'border-purple-300',
-                        'pillBg'   => 'bg-purple-600 text-white border-purple-700',
-                        'emoji'    => '🔬',
-                        'btn'      => 'btn-tactile-primary',
-                    ],
                     default => [
                         'headerBg' => 'linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%)',
                         'border'   => 'border-amber-300',
