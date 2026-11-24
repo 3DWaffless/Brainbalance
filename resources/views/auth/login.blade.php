@@ -76,8 +76,13 @@
             @enderror
         </div>
 
-        <label for="remember_me" class="inline-flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" id="remember_me" name="remember" class="w-4 h-4 rounded accent-[#0066D6] cursor-pointer">
+        <label for="remember_me" class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+            <input type="checkbox"
+                   id="remember_me"
+                   name="remember"
+                   value="1"
+                   {{ old('remember') ? 'checked' : '' }}
+                   class="w-4 h-4 rounded border-2 border-[#B8E2F8] text-[#0066D6] accent-[#0066D6] focus:ring-2 focus:ring-[#1DC4DF] cursor-pointer">
             <span class="text-xs font-extrabold text-[#5A7696]">Keep me logged in</span>
         </label>
 

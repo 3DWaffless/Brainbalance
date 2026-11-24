@@ -1,4 +1,5 @@
 <?php
+// FILE: app/Http/Controllers/Auth/AuthController.php
 
 namespace App\Http\Controllers\Auth;
 
@@ -12,6 +13,12 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
+        if (Auth::check()) {
+            return Auth::user()->isAdmin()
+                ? redirect()->route('admin.dashboard')
+                : redirect()->route('dashboard');
+        }
+
         return view('auth');
     }
 
@@ -35,11 +42,17 @@ class AuthController extends Controller
 
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',
-        ])->onlyInput('email');
+        ])->onlyInput('email', 'remember');
     }
 
     public function showRegister()
     {
+        if (Auth::check()) {
+            return Auth::user()->isAdmin()
+                ? redirect()->route('admin.dashboard')
+                : redirect()->route('dashboard');
+        }
+
         return view('auth');
     }
 

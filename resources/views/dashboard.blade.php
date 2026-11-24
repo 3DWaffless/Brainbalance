@@ -11,19 +11,19 @@
         <div class="card-tactile flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white w-full">
             <div>
                 <h1 class="text-xl sm:text-2xl md:text-3xl font-black text-brand-text flex items-center gap-2">
-                    Teacher Workspace 🧑‍🏫
+                    Teacher Workspace
                 </h1>
                 <p class="text-xs sm:text-sm font-extrabold text-gray-400 mt-1">
-                    Create classes, generate AI quizzes, and track student progress.
+                    Create classes, Formulate quizzes, and track student progress.
                 </p>
             </div>
 
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
                 <a href="{{ route('quiz.create') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
-                    ⚡ Generate AI Quiz
+                    Create Quiz
                 </a>
                 <button type="button" onclick="document.getElementById('create-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs py-2.5 px-4">
-                    ➕ Create Class
+                    Create Class
                 </button>
             </div>
         </div>
@@ -46,7 +46,7 @@
                         Welcome back, <span class="text-brand-coral">{{ Auth::user()->first_name ?? 'Explorer' }}</span>! 👋
                     </h1>
                     <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
-                        Complete Math &amp; English quests to earn XP and unlock fastest-time medals in your chest!
+                        Complete Math &amp; English quizzes to earn XP and unlock fastest-time medals in your chest!
                     </p>
 
                     <!-- XP Progress Track -->
@@ -63,10 +63,10 @@
 
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
                     <a href="{{ route('quiz.index') }}" class="btn-tactile-orange text-xs sm:text-sm py-3 px-5">
-                        ⚔️ Start a Quiz Quest
+                        Take a Quiz
                     </a>
                     <button type="button" onclick="document.getElementById('join-class-modal')?.classList.remove('hidden')" class="btn-tactile-primary text-xs sm:text-sm py-3 px-5">
-                        🔑 Join New Class
+                        Join New Class
                     </button>
                 </div>
             </div>
@@ -203,7 +203,7 @@
             </div>
         </div>
 
-        <!-- Right Side Column (Medal Treasure Box for Students + Recent Quests Feed) -->
+        <!-- Right Side Column (Medal Treasure Box for Students + Recent Quizzes Feed) -->
         <div class="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
 
             @include('partials.medal-box')
@@ -211,10 +211,10 @@
             <div class="card-tactile flex-1">
                 <div class="flex justify-between items-center mb-4 sm:mb-6 pb-3 border-b-4 border-dashed border-brand-border">
                     <h3 class="font-display text-lg sm:text-xl font-bold text-brand-text flex items-center gap-2">
-                        @if(Auth::user()->isTeacher()) 📝 Recent Quizzes @else ⚔️ Latest Quiz Quests @endif
+                        @if(Auth::user()->isTeacher()) Recent Quizzes @else Latest Quizzes @endif
                     </h3>
                     <a href="{{ route('quiz.index') }}" class="text-xs font-black text-brand-coral hover:underline">
-                        All Quests &rarr;
+                        All Quizzes &rarr;
                     </a>
                 </div>
 
@@ -236,7 +236,7 @@
                                         </a>
                                     @else
                                         <a href="{{ route('quiz.show', $quiz->id) }}" class="btn-tactile-teal text-xs py-2 px-3.5 w-full sm:w-auto">
-                                            Play Quest ⚔️
+                                            Take Quiz
                                         </a>
                                     @endif
                                 </div>
@@ -246,7 +246,7 @@
                 @else
                     <div class="text-center py-8 bg-brand-bg/60 rounded-2xl border-2 border-dashed border-brand-border">
                         <div class="text-3xl mb-2">⚔️</div>
-                        <p class="text-xs font-bold text-slate-400">No quiz quests available right now.</p>
+                        <p class="text-xs font-bold text-slate-400">No quizzes available right now.</p>
                     </div>
                 @endif
             </div>

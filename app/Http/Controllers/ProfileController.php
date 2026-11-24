@@ -5,13 +5,61 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class ProfileController extends Controller
 {
+    protected function prepareSupabaseDisk(): string
+    {
+        $key    = config('filesystems.disks.supabase.key') ?: (getenv('SUPABASE_S3_KEY') ?: null);
+        $secret = config('filesystems.disks.supabase.secret') ?: (getenv('SUPABASE_S3_SECRET') ?: null);
+        $region = config('filesystems.disks.supabase.region') ?: (getenv('SUPABASE_S3_REGION') ?: 'ap-northeast-2');
+        $bucket = config('filesystems.disks.supabase.bucket') ?: (getenv('SUPABASE_S3_BUCKET') ?: 'brainbalance-files');
+
+        if (!$key && !app()->environment('production')) {
+            return 'public';
+        }
+
+        $endpoint = (string) config('filesystems.disks.supabase.endpoint', '');
+        if ($endpoint === '' || str_contains($endpoint, 'your-project-ref')) {
+            $liveEnv = (string) (getenv('SUPABASE_S3_ENDPOINT') ?: ($_SERVER['SUPABASE_S3_ENDPOINT'] ?? ''));
+            if ($liveEnv !== '' && !str_contains($liveEnv, 'your-project-ref')) {
+                $endpoint = $liveEnv;
+            } else {
+                $pgSources = [
+                    (string) config('database.connections.pgsql.host', ''),
+                    (string) config('database.connections.pgsql.username', ''),
+                    (string) config('database.connections.pgsql.url', ''),
+                ];
+
+                $projectRef = 'ipqhovyvflixeealsidh';
+                foreach ($pgSources as $src) {
+                    if (preg_match('/(?:db\.|postgres\.)([a-z0-9]{15,})/i', $src, $m)) {
+                        $projectRef = $m[1];
+                        break;
+                    }
+                }
+
+                $endpoint = 'https://' . $projectRef . '.supabase.co/storage/v1/s3';
+            }
+        }
+
+        config([
+            'filesystems.disks.supabase.key'      => $key,
+            'filesystems.disks.supabase.secret'   => $secret,
+            'filesystems.disks.supabase.region'   => $region,
+            'filesystems.disks.supabase.bucket'   => $bucket,
+            'filesystems.disks.supabase.endpoint' => rtrim($endpoint, '/'),
+        ]);
+
+        Storage::forgetDisk('supabase');
+
+        return 'supabase';
+    }
+
     // ---------------------------------------------------------------
     // SHOW SETTINGS PAGE
     // ---------------------------------------------------------------
@@ -34,9 +82,9 @@ class ProfileController extends Controller
 
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name'  => ['required', 'string', 'max:255'],
+            'last_name'  => ['nullable', 'string', 'max:255'],
             'email'      => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'avatar'     => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'avatar'     => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
             'password'   => ['nullable', 'confirmed', Password::min(8)],
         ]);
 
@@ -49,56 +97,54 @@ class ProfileController extends Controller
             ]);
         }
 
-        // Handle Avatar Upload
+        // Handle Avatar Upload to Supabase Storage (brainbalance-files/avatars/)
         if ($request->hasFile('avatar')) {
             $file = $request->file('avatar');
-            $extension = $file->getClientOriginalExtension();
-            
-            // Clean filename without folder duplication
+            $extension = strtolower($file->getClientOriginalExtension() ?: 'png');
             $fileName = time() . '_' . $user->id . '.' . $extension;
 
-            $supabaseUrl = env('SUPABASE_URL', 'https://ipqhovyvflixeealsidh.supabase.co');
-            $supabaseKey = env('SUPABASE_SERVICE_ROLE_KEY', env('SUPABASE_KEY'));
+            try {
+                $disk = $this->prepareSupabaseDisk();
 
-            // Delete existing local file if replacing a previous local avatar
-            if ($user->avatar && !str_starts_with($user->avatar, 'http') && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
-            }
-
-            if ($supabaseKey) {
-                // Prepare request with required Supabase API headers
-                $httpClient = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $supabaseKey,
-                    'apiKey'        => $supabaseKey,
-                    'Content-Type'  => $file->getMimeType(),
-                ]);
-
-                // Disable SSL check ONLY on local dev machine to bypass cURL error 60.
-                // Enforces strict SSL verification when deployed in production.
-                if (app()->environment('local')) {
-                    $httpClient->withoutVerifying();
+                // Clean up previous avatar file if present
+                if ($user->avatar) {
+                    if (!str_starts_with($user->avatar, 'http') && Storage::disk('public')->exists($user->avatar)) {
+                        Storage::disk('public')->delete($user->avatar);
+                    } elseif ($disk === 'supabase' && preg_match('#/storage/v1/object/public/[^/]+/(avatars/.+)$#', $user->avatar, $m)) {
+                        try {
+                            Storage::disk('supabase')->delete($m[1]);
+                        } catch (\Throwable $e) {
+                            // Ignore cleanup errors for old avatar
+                        }
+                    }
                 }
 
-                $response = $httpClient->withBody(
-                    file_get_contents($file->getRealPath()),
-                    $file->getMimeType()
-                )->post("{$supabaseUrl}/storage/v1/object/avatars/{$fileName}");
+                $storedPath = $file->storeAs('avatars', $fileName, $disk);
+                if (!$storedPath) {
+                    throw new \RuntimeException('Storage returned an empty path.');
+                }
 
-                if ($response->successful() || $response->status() === 200) {
-                    $user->avatar = "{$supabaseUrl}/storage/v1/object/public/avatars/{$fileName}";
+                if ($disk === 'supabase') {
+                    $endpoint   = rtrim((string) config('filesystems.disks.supabase.endpoint'), '/');
+                    $bucket     = trim((string) config('filesystems.disks.supabase.bucket'), '/');
+                    $publicBase = preg_replace('#/storage/v1/s3$#', '/storage/v1/object/public', $endpoint);
+                    $user->avatar = $publicBase . '/' . $bucket . '/' . ltrim($storedPath, '/');
                 } else {
-                    // Fallback to local storage if API fails
-                    $user->avatar = $file->store('avatars', 'public');
+                    $user->avatar = $storedPath;
                 }
-            } else {
-                // Local disk storage fallback
-                $user->avatar = $file->store('avatars', 'public');
+            } catch (\Throwable $e) {
+                $reason = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+                Log::error('Avatar upload failed: ' . $reason, ['exception' => $e]);
+
+                return back()
+                    ->withErrors(['avatar' => 'Profile picture upload failed: ' . $reason])
+                    ->withInput();
             }
         }
 
         $user->first_name = $data['first_name'];
-        $user->last_name  = $data['last_name'];
-        $user->name       = $data['first_name'] . ' ' . $data['last_name'];
+        $user->last_name  = $data['last_name'] ?? '';
+        $user->name       = trim($data['first_name'] . ' ' . ($data['last_name'] ?? ''));
         $user->email      = $data['email'];
 
         if ($request->filled('password')) {
@@ -125,7 +171,6 @@ class ProfileController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Remove avatar file on account deletion if local
         if ($user->avatar && !str_starts_with($user->avatar, 'http') && Storage::disk('public')->exists($user->avatar)) {
             Storage::disk('public')->delete($user->avatar);
         }

@@ -1,207 +1,231 @@
 {{-- FILE: resources/views/quiz/review.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Attempt Review - ' . config('app.name', 'BrainBalance'))
+@section('title', 'Quiz Review - ' . config('app.name', 'BrainBalance'))
 
 @section('content')
 @php
-    $accuracyPct = $attempt->total_questions > 0
+    $isStaff = in_array(auth()->user()->role ?? '', ['teacher', 'admin'], true);
+    $accuracy = $attempt->total_questions > 0
         ? round(($attempt->score / $attempt->total_questions) * 100)
         : 0;
-
-    $celebration = match(true) {
-        $accuracyPct >= 90 => ['emoji' => '🏆', 'label' => 'Superstar Score!', 'bg' => 'linear-gradient(135deg, #FEF9C3 0%, #FFFFFF 55%, #DCFCE7 100%)'],
-        $accuracyPct >= 70 => ['emoji' => '🌟', 'label' => 'Awesome Work!', 'bg' => 'linear-gradient(135deg, #E0F2FE 0%, #FFFFFF 55%, #ECFCCB 100%)'],
-        default            => ['emoji' => '💪', 'label' => 'Great Effort!', 'bg' => 'linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 55%, #EEF6FF 100%)'],
-    };
-
-    $optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    $studentFullName = trim(($attempt->student->first_name ?? '') . ' ' . ($attempt->student->last_name ?? ''))
+        ?: ($attempt->student->name ?? 'Student');
 @endphp
 
 <div class="flex flex-col gap-6 sm:gap-8 w-full">
-    <div class="card-tactile flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-         style="background: {{ $celebration['bg'] }} !important;">
-        <div class="flex items-start sm:items-center gap-4">
-            <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border-3 border-amber-300 flex items-center justify-center text-3xl sm:text-4xl shrink-0 shadow-2xs">
-                {{ $celebration['emoji'] }}
+    <!-- Top Summary Banner -->
+    <div class="card-tactile flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5"
+         style="background: linear-gradient(135deg, #EBF5FF 0%, #FFFFFF 55%, #ECFCCB 100%) !important;">
+        <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white border border-sky-200 text-[10px] font-black text-brand-coral uppercase tracking-wider mb-1.5">
+                🔍 Attempt Breakdown
             </div>
-            <div>
-                <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white border border-sky-200 text-[10px] font-black text-[#0066D6] uppercase tracking-wider mb-1">
-                    {{ $celebration['label'] }} &bull; Quiz Breakdown
-                </div>
-                <h1 class="font-display text-2xl md:text-3xl font-bold text-brand-text leading-tight">
-                    Review: {{ $attempt->quiz->title }} 📝
-                </h1>
-                <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
-                    Completed on {{ $attempt->created_at->format('M d, Y \a\t g:i A') }} &bull; Class: <span class="text-[#0066D6]">{{ $attempt->quiz->classroom->name ?? 'N/A' }}</span>
-                </p>
-            </div>
+            <h1 class="font-display text-2xl md:text-3xl font-bold text-brand-text">
+                {{ $quiz->title ?? 'Quiz Review' }}
+            </h1>
+            <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
+                @if($isStaff)
+                    <span class="text-brand-text">👤 {{ $studentFullName }}</span> &bull;
+                @endif
+                🏫 {{ $quiz->classroom->name ?? 'Classroom' }} &bull;
+                📅 {{ $attempt->created_at->format('M d, Y g:i A') }} &bull;
+                ⏱️ {{ floor(($attempt->time_taken_seconds ?? 0) / 60) }}m {{ ($attempt->time_taken_seconds ?? 0) % 60 }}s
+            </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-            <a href="{{ route('quiz.show', $attempt->quiz_id) }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
-                &larr; Back to Quiz
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ route('quiz.history') }}" class="btn-tactile-teal text-xs py-2.5 px-4">
+                &larr; Quiz History
             </a>
-            @if(\Illuminate\Support\Facades\Route::has('quiz.history'))
-                <a href="{{ route('quiz.history') }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
-                    📜 History
-                </a>
-            @endif
-            <a href="{{ route('dashboard') }}" class="btn-tactile-primary text-xs py-2.5 px-4">
-                Dashboard &rarr;
+            <a href="{{ route('quiz.index') }}" class="btn-tactile-ghost text-xs py-2.5 px-4">
+                📋 All Quizzes
             </a>
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="card-tactile text-center" style="background: #EBF5FF !important; border-color: #93C5FD !important;">
-            <div class="text-[11px] font-black text-slate-500 uppercase tracking-wider">🎯 Final Score</div>
-            <div class="font-display text-2xl sm:text-3xl font-bold text-[#0066D6] mt-1">
-                {{ $attempt->score }} / {{ $attempt->total_questions }}
-            </div>
+    <!-- Score & XP Stats Row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="card-tactile text-center py-4">
+            <div class="text-2xl font-black text-brand-text">{{ $attempt->score }} / {{ $attempt->total_questions }}</div>
+            <div class="text-[11px] font-black text-slate-400 uppercase mt-1">Score</div>
         </div>
-        <div class="card-tactile text-center" style="background: #ECFCCB !important; border-color: #86EFAC !important;">
-            <div class="text-[11px] font-black text-slate-500 uppercase tracking-wider">✨ Accuracy</div>
-            <div class="font-display text-2xl sm:text-3xl font-bold text-[#3E8708] mt-1">
-                {{ $accuracyPct }}%
-            </div>
+        <div class="card-tactile text-center py-4">
+            <div class="text-2xl font-black text-brand-teal">{{ $accuracy }}%</div>
+            <div class="text-[11px] font-black text-slate-400 uppercase mt-1">Accuracy</div>
         </div>
-        <div class="card-tactile text-center" style="background: #FFF7ED !important; border-color: #FDBA74 !important;">
-            <div class="text-[11px] font-black text-slate-500 uppercase tracking-wider">🔥 Max Streak</div>
-            <div class="font-display text-2xl sm:text-3xl font-bold text-[#C2410C] mt-1">
-                {{ $attempt->max_streak }}x
-            </div>
+        <div class="card-tactile text-center py-4">
+            <div class="text-2xl font-black text-brand-amber">+{{ $attempt->total_xp }} XP</div>
+            <div class="text-[11px] font-black text-slate-400 uppercase mt-1">XP Earned</div>
         </div>
-        <div class="card-tactile text-center" style="background: #FEFCE8 !important; border-color: #FDE047 !important;">
-            <div class="text-[11px] font-black text-slate-500 uppercase tracking-wider">⭐ XP Earned</div>
-            <div class="font-display text-2xl sm:text-3xl font-bold text-amber-600 mt-1">
-                +{{ $attempt->total_xp }}
-            </div>
+        <div class="card-tactile text-center py-4">
+            <div class="text-2xl font-black text-purple-600">🔥 {{ $attempt->max_streak ?? 0 }}</div>
+            <div class="text-[11px] font-black text-slate-400 uppercase mt-1">Best Streak</div>
         </div>
     </div>
 
-    <div class="flex flex-col gap-4">
-        <div class="flex items-center justify-between">
-            <h2 class="font-display text-xl sm:text-2xl font-bold text-brand-text">🔍 Question-by-Question Check</h2>
-            <span class="text-xs font-black text-slate-400">{{ $attempt->responses->count() }} Items</span>
+    <!-- Question-by-Question Review List -->
+    <div class="card-tactile">
+        <div class="flex justify-between items-center mb-6 pb-3 border-b-4 border-dashed border-brand-border">
+            <h2 class="font-display text-lg sm:text-xl font-bold text-brand-text flex items-center gap-2">
+                📝 Questions &amp; Answers
+            </h2>
+            <span class="px-3 py-1 rounded-full bg-sky-100 border border-sky-200 text-brand-coral font-black text-xs">
+                {{ count($reviewItems) }} Questions
+            </span>
         </div>
 
-        @foreach($attempt->responses as $index => $response)
-            @php
-                $question = $response->question;
-                $qType = strtolower((string) ($question->question_type ?? $question->type ?? 'multiple_choice'));
-                if ($qType === 'identification') $qType = 'short_answer';
-                $options = is_array($question->options ?? null) ? $question->options : [];
-                if ($qType === 'true_false' && empty($options)) $options = ['True', 'False'];
-
-                $selectedIndex = $response->selected_index ?? $response->selected_option;
-                $decodedTyped = json_decode((string) ($response->typed_answer ?? ''), true);
-                $decodedCorrect = json_decode((string) ($question->correct_answer ?? ''), true);
-
-                $isCorrect = (bool) $response->is_correct;
-            @endphp
-
-            <div class="card-tactile border-l-8 {{ $isCorrect ? 'border-l-emerald-500' : 'border-l-rose-500' }}">
-                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
-                    <div class="flex items-center gap-2.5">
-                        <span class="px-3.5 py-1 rounded-full text-xs font-black border-2 {{ $isCorrect ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300' }}">
-                            {{ $isCorrect ? '✅ Correct' : '💡 Keep Learning' }}
-                        </span>
-                        <span class="text-xs font-black text-[#0066D6] uppercase tracking-wider">Question {{ $index + 1 }}</span>
-                    </div>
-
-                    <span class="text-xs font-extrabold text-slate-400">
-                        ⏱️ {{ $response->time_taken_seconds ?? 0 }}s &bull; ⭐ +{{ $response->xp_earned ?? 0 }} XP
-                    </span>
-                </div>
-
-                <h3 class="text-base sm:text-lg font-black text-brand-text mb-4 leading-snug">
-                    {{ $question->question_text ?? 'Question text unavailable' }}
-                </h3>
-
-                @if(in_array($qType, ['multiple_choice', 'multiple_select', 'true_false'], true) && !empty($options))
+        @if(count($reviewItems) > 0)
+            <div class="flex flex-col gap-5">
+                @foreach($reviewItems as $item)
                     @php
-                        $rightList = is_array($decodedCorrect) ? $decodedCorrect : [trim((string) ($question->correct_answer ?? ''))];
-                        $chosenList = is_array($decodedTyped)
-                            ? $decodedTyped
-                            : (is_numeric($selectedIndex) && isset($options[(int) $selectedIndex]) ? [$options[(int) $selectedIndex]] : []);
+                        $isCorrect = $item['is_correct'];
+                        $borderClass = $isCorrect === true
+                            ? 'border-lime-300 bg-lime-50/40'
+                            : ($isCorrect === false ? 'border-amber-300 bg-amber-50/40' : 'border-brand-border bg-white');
                     @endphp
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        @foreach($options as $optIdx => $optText)
-                            @php
-                                $isRightChoice = in_array(trim((string) $optText), array_map('trim', $rightList), true);
-                                $isUserChoice = in_array(trim((string) $optText), array_map('trim', $chosenList), true);
-
-                                $cardStyle = 'bg-brand-bg border-brand-border';
-                                $badge = null;
-                                $badgeStyle = '';
-
-                                if ($isRightChoice) {
-                                    $cardStyle = 'bg-emerald-50 border-emerald-400';
-                                    $badge = $isUserChoice ? '✅ Your Pick (Correct)' : '✅ Correct Answer';
-                                    $badgeStyle = 'text-emerald-700 border border-emerald-200';
-                                } elseif ($isUserChoice) {
-                                    $cardStyle = 'bg-rose-50 border-rose-400';
-                                    $badge = '❌ Your Choice';
-                                    $badgeStyle = 'text-rose-700 border border-rose-200';
-                                }
-                            @endphp
-                            <div class="p-3.5 rounded-2xl border-3 {{ $cardStyle }} flex justify-between items-center gap-2 text-xs sm:text-sm font-extrabold text-brand-text">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="w-7 h-7 rounded-lg bg-white border-2 border-brand-border flex items-center justify-center text-xs font-black text-[#0066D6] shrink-0">
-                                        {{ $optionLetters[$optIdx] ?? ($optIdx + 1) }}
+                    <div class="rounded-3xl border-3 {{ $borderClass }} p-5 sm:p-6 shadow-2xs">
+                        <!-- Top Question Metadata Bar -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="px-3 py-1 rounded-xl bg-white border-2 border-brand-border text-xs font-black text-brand-text">
+                                    Question #{{ $item['number'] }}
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-sky-100 border border-sky-200 text-[11px] font-black text-brand-coral">
+                                    {{ $item['type_label'] }}
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-black text-slate-600 capitalize">
+                                    {{ $item['difficulty'] }}
+                                </span>
+                                @if($isCorrect === true)
+                                    <span class="px-3 py-1 rounded-full bg-lime-100 border border-lime-300 text-xs font-black text-lime-800">
+                                        ✅ Correct (+{{ $item['xp_earned'] }} XP)
                                     </span>
-                                    <span class="break-words">{{ $optText }}</span>
-                                </div>
-                                @if($badge)
-                                    <span class="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-white shadow-2xs shrink-0 {{ $badgeStyle }}">
-                                        {{ $badge }}
+                                @elseif($isCorrect === false)
+                                    <span class="px-3 py-1 rounded-full bg-orange-100 border border-orange-300 text-xs font-black text-orange-800">
+                                        ❌ Needs Review
                                     </span>
                                 @endif
                             </div>
-                        @endforeach
-                    </div>
-                @elseif($qType === 'matching')
-                    @php
-                        $pairs = is_array($question->matching_pairs) && !empty($question->matching_pairs)
-                            ? $question->matching_pairs
-                            : (is_array($decodedCorrect) ? $decodedCorrect : []);
-                    @endphp
-                    <div class="flex flex-wrap gap-2">
-                        @foreach($pairs as $pIdx => $pair)
-                            @php $givenRight = is_array($decodedTyped) ? ($decodedTyped[$pIdx] ?? 'Unmatched') : ''; @endphp
-                            <div class="p-3 rounded-2xl border-2 {{ $isCorrect ? 'bg-emerald-50 border-emerald-300' : 'bg-sky-50 border-sky-200' }} text-xs font-black">
-                                {{ $pair['left'] ?? '' }} ↔ <span class="text-emerald-700">{{ $pair['right'] ?? '' }}</span>
-                                @if($givenRight !== '')
-                                    <div class="text-[11px] text-slate-500 mt-0.5">Your match: {{ $givenRight }}</div>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    @php
-                        $studentDisplay = is_array($decodedTyped)
-                            ? implode(', ', $decodedTyped)
-                            : ($response->typed_answer ?? '');
-                        $correctDisplay = is_array($decodedCorrect)
-                            ? implode(' | ', $decodedCorrect)
-                            : ($question->correct_answer ?? '');
-                    @endphp
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div class="p-3.5 rounded-2xl border-3 {{ $isCorrect ? 'bg-emerald-50 border-emerald-400' : 'bg-rose-50 border-rose-400' }}">
-                            <div class="text-[10px] font-black uppercase {{ $isCorrect ? 'text-emerald-700' : 'text-rose-700' }}">Your Answer</div>
-                            <div class="text-sm font-black text-brand-text mt-0.5">{{ $studentDisplay ?: 'No answer submitted' }}</div>
+
+                            <button type="button"
+                                    onclick="speakReviewText({{ Js::from($item['question_text']) }})"
+                                    class="btn-tactile-ghost text-xs py-1.5 px-3"
+                                    title="Read question aloud">
+                                🔊 Listen
+                            </button>
                         </div>
-                        @if($correctDisplay !== '' && $qType !== 'essay')
-                            <div class="p-3.5 rounded-2xl border-3 bg-emerald-50 border-emerald-400">
-                                <div class="text-[10px] font-black uppercase text-emerald-700">Expected Answer</div>
-                                <div class="text-sm font-black text-brand-text mt-0.5">{{ $correctDisplay }}</div>
+
+                        <!-- Question Prompt -->
+                        <p class="text-base sm:text-lg font-black text-brand-text leading-snug mb-4">
+                            {{ $item['question_text'] }}
+                        </p>
+
+                        <!-- Option-Based Questions (Multiple Choice, True/False, Multiple Select) -->
+                        @if(in_array($item['type'], ['multiple_choice', 'true_false', 'multiple_select'], true) && count($item['options']) > 0)
+                            @php
+                                $normalizedCorrect = array_map(fn ($v) => mb_strtolower(trim((string) $v)), $item['correct_options']);
+                            @endphp
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+                                @foreach($item['options'] as $optIdx => $optionText)
+                                    @php
+                                        $wasPicked = in_array($optIdx, $item['selected_indices'], true);
+                                        $isOptionRight = in_array(mb_strtolower(trim((string) $optionText)), $normalizedCorrect, true);
+
+                                        if ($wasPicked && $isOptionRight) {
+                                            $optClasses = 'bg-lime-100 border-lime-500 text-lime-950';
+                                            $optBadge = '✅ Your Answer';
+                                        } elseif ($wasPicked && !$isOptionRight) {
+                                            $optClasses = 'bg-orange-100 border-orange-400 text-orange-950';
+                                            $optBadge = '❌ Your Answer';
+                                        } elseif ($isOptionRight) {
+                                            $optClasses = 'bg-emerald-50 border-emerald-400 text-emerald-900';
+                                            $optBadge = '✓ Correct Answer';
+                                        } else {
+                                            $optClasses = 'bg-white border-brand-border text-slate-600';
+                                            $optBadge = null;
+                                        }
+                                    @endphp
+                                    <div class="flex items-center justify-between gap-2 px-4 py-3 rounded-2xl border-2 {{ $optClasses }} text-sm font-extrabold">
+                                        <span>{{ $optionText }}</span>
+                                        @if($optBadge)
+                                            <span class="text-[11px] font-black shrink-0">{{ $optBadge }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <!-- Matching Questions Breakdown -->
+                        @if($item['type'] === 'matching' && count($item['matching_rows']) > 0)
+                            <div class="flex flex-col gap-2 mb-4">
+                                @foreach($item['matching_rows'] as $row)
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-white border-2 {{ $row['is_match'] ? 'border-lime-300' : 'border-orange-300' }} text-xs sm:text-sm font-extrabold">
+                                        <span class="text-brand-text">{{ $row['left'] }}</span>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="{{ $row['is_match'] ? 'text-lime-700' : 'text-orange-700' }}">
+                                                {{ $row['is_match'] ? '✅' : '❌' }} Your match: {{ $row['student_right'] }}
+                                            </span>
+                                            @if(!$row['is_match'])
+                                                <span class="text-emerald-700 font-black">
+                                                    (Correct: {{ $row['correct_right'] }})
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <!-- Summary Answer Boxes (Always Shown for Clarity) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="rounded-2xl bg-white border-2 {{ $isCorrect === false ? 'border-orange-300' : 'border-brand-border' }} px-4 py-3">
+                                <div class="text-[10px] font-black uppercase tracking-wider {{ $isCorrect === false ? 'text-orange-600' : 'text-slate-400' }}">
+                                    {{ $isStaff ? "Student's Answer" : 'Your Answer' }}
+                                </div>
+                                <div class="text-sm font-black text-brand-text mt-0.5 break-words">
+                                    {{ $item['student_answer'] }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl bg-white border-2 border-lime-300 px-4 py-3">
+                                <div class="text-[10px] font-black uppercase tracking-wider text-lime-700">
+                                    Correct Answer
+                                </div>
+                                <div class="text-sm font-black text-lime-900 mt-0.5 break-words">
+                                    {{ $item['correct_answer'] }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Optional Explanation -->
+                        @if(!empty($item['explanation']))
+                            <div class="mt-3 rounded-2xl bg-sky-50 border-2 border-sky-200 px-4 py-3 text-xs sm:text-sm font-bold text-slate-700">
+                                <span class="font-black text-brand-coral">💡 Helpful Tip:</span>
+                                {{ $item['explanation'] }}
                             </div>
                         @endif
                     </div>
-                @endif
+                @endforeach
             </div>
-        @endforeach
+        @else
+            <div class="text-center py-10">
+                <div class="text-4xl mb-2">📭</div>
+                <p class="text-sm font-extrabold text-slate-500">
+                    No question records were found for this quiz attempt.
+                </p>
+            </div>
+        @endif
     </div>
 </div>
+
+<script>
+    function speakReviewText(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+    }
+</script>
 @endsection

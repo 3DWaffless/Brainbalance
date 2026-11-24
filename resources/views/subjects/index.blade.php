@@ -14,10 +14,10 @@
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-sky-200 text-brand-coral font-black text-[11px] uppercase tracking-wider mb-2 shadow-2xs">
-                <span>{{ $isTeacherOrAdmin ? '🏫 Class Management' : '🗺️ Explorer Map' }}</span>
+                <span>{{ $isTeacherOrAdmin ? 'Class Management' : '🗺️ Explorer Map' }}</span>
             </div>
             <h1 class="font-display text-2xl sm:text-3xl font-bold text-brand-text flex items-center gap-2">
-                {{ $isTeacherOrAdmin ? 'Managed Subjects & Classes 📚' : 'My Subject Worlds 🎒' }}
+                {{ $isTeacherOrAdmin ? 'Manage Subjects & Classes' : 'My Subjects' }}
             </h1>
             <p class="text-xs sm:text-sm font-extrabold text-slate-500 mt-1">
                 {{ $isTeacherOrAdmin
