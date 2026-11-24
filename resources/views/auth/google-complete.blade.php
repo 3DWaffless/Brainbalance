@@ -135,6 +135,7 @@
 
             <form method="POST" action="{{ route('auth.google.complete.store') }}" enctype="multipart/form-data">
                 @csrf
+                <input type="hidden" name="google_payload" value="{{ old('google_payload', $encryptedGoogleData ?? '') }}">
 
                 <div class="avatar-box">
                     @if (!empty($googleData['avatar']))
@@ -163,7 +164,7 @@
                             <div class="role-desc">Learn &amp; earn medals</div>
                         </div>
                         <div class="role-btn" id="role-teacher" onclick="selectRole('teacher')">
-                            <div class="role-emoji">🧑‍🏫</div>
+                            <div class="role-emoji">👩‍🏫</div>
                             <div class="role-name">Teacher</div>
                             <div class="role-desc">Manage classes</div>
                         </div>

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -51,7 +52,7 @@ class SocialiteController extends Controller
             $googleUser = $this->googleDriver()->user();
         } catch (InvalidStateException $e) {
             Log::error('Google OAuth InvalidStateException: session cookie missing or mismatched.');
-            return redirect()->route('login')->with('error', 'Google sign-in session expired (Invalid State). Please try again.');
+            return redirect()->route('login')->with('error', 'Google sign-in session expired. Please try again.');
         } catch (\Throwable $e) {
             Log::error('Google OAuth Callback Error [' . get_class($e) . ']: ' . $e->getMessage());
             $detail = $e->getMessage() ?: class_basename($e);
@@ -114,12 +115,26 @@ class SocialiteController extends Controller
             return redirect()->route('register')->with('error', 'Please start by signing in with Google first.');
         }
 
-        return view('auth.google-complete', compact('googleData'));
+        $encryptedGoogleData = Crypt::encryptString(json_encode($googleData));
+
+        return view('auth.google-complete', compact('googleData', 'encryptedGoogleData'));
     }
 
     public function completeRegistration(Request $request)
     {
         $googleData = $request->session()->get('google_signup_data');
+
+        if ((!$googleData || empty($googleData['email'])) && $request->filled('google_payload')) {
+            try {
+                $decoded = json_decode(Crypt::decryptString((string) $request->input('google_payload')), true);
+                if (is_array($decoded) && !empty($decoded['email']) && !empty($decoded['google_id'])) {
+                    $googleData = $decoded;
+                    $request->session()->put('google_signup_data', $googleData);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to decrypt fallback google_payload: ' . $e->getMessage());
+            }
+        }
 
         if (!$googleData || empty($googleData['email'])) {
             return redirect()->route('register')->with('error', 'Your Google sign-up session expired. Please try again.');
