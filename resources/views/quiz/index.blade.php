@@ -440,7 +440,7 @@
                     🟢 Published ({{ $publishedCount }})
                 </button>
                 <button type="button" class="quiz-tab-btn" onclick="filterQuizCards('draft', this)">
-                    Draft ({{ $draftCount }})
+                    📝 Draft ({{ $draftCount }})
                 </button>
             </div>
         @else
