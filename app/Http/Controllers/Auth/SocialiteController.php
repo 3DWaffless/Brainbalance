@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -63,7 +64,7 @@ class SocialiteController extends Controller
         $googleId = $googleUser->getId();
         $hasGoogleIdCol = Schema::hasColumn('users', 'google_id');
 
-        // 1. Returning user -> log directly into the appropriate dashboard
+        // 1. Existing user -> sign in without creating a new account
         $existingUser = User::where('email', $email)
             ->when($hasGoogleIdCol, fn($q) => $q->orWhere('google_id', $googleId))
             ->first();
@@ -84,7 +85,7 @@ class SocialiteController extends Controller
             return redirect()->intended(route('dashboard'));
         }
 
-        // 2. Extract First & Last Name from Google profile for form autofill
+        // 2. New user -> DO NOT create a database record yet; only stage profile data for completion
         $rawUser = $googleUser->user ?? [];
         $firstName = $rawUser['given_name'] ?? '';
         $lastName  = $rawUser['family_name'] ?? '';
@@ -95,7 +96,6 @@ class SocialiteController extends Controller
             $lastName  = $parts[1] ?? '';
         }
 
-        // 3. Store Google info in session and send user to profile completion form
         $request->session()->put('google_signup_data', [
             'google_id'  => $googleId,
             'first_name' => $firstName,
@@ -140,6 +140,14 @@ class SocialiteController extends Controller
             return redirect()->route('register')->with('error', 'Your Google sign-up session expired. Please try again.');
         }
 
+        // Require explicit click on the "Finish & Enter BrainBalance" submit button
+        if ($request->input('finish_signup') !== '1') {
+            return redirect()
+                ->route('auth.google.complete')
+                ->withInput($request->except(['password', 'password_confirmation']))
+                ->withErrors(['finish_signup' => 'Please click "Finish & Enter BrainBalance" to create your account.']);
+        }
+
         $request->validate([
             'role'       => 'required|in:student,teacher',
             'first_name' => 'required|string|max:255',
@@ -148,6 +156,16 @@ class SocialiteController extends Controller
             'password'   => 'required|string|min:8|confirmed',
             'avatar'     => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048',
         ]);
+
+        $hasGoogleIdCol = Schema::hasColumn('users', 'google_id');
+        $alreadyExists = User::where('email', $googleData['email'])
+            ->when($hasGoogleIdCol, fn($q) => $q->orWhere('google_id', $googleData['google_id']))
+            ->exists();
+
+        if ($alreadyExists) {
+            $request->session()->forget('google_signup_data');
+            return redirect()->route('login')->with('error', 'An account with this Google profile already exists. Please sign in.');
+        }
 
         $avatarUrl = $googleData['avatar'] ?? null;
 
@@ -158,36 +176,40 @@ class SocialiteController extends Controller
             }
         }
 
-        $user = new User();
+        $user = DB::transaction(function () use ($request, $googleData, $avatarUrl, $hasGoogleIdCol) {
+            $newUser = new User();
 
-        if (Schema::hasColumn('users', 'name')) {
-            $user->name = trim($request->first_name . ' ' . $request->last_name);
-        }
-        if (Schema::hasColumn('users', 'first_name')) {
-            $user->first_name = $request->first_name;
-        }
-        if (Schema::hasColumn('users', 'last_name')) {
-            $user->last_name = $request->last_name;
-        }
+            if (Schema::hasColumn('users', 'name')) {
+                $newUser->name = trim($request->first_name . ' ' . $request->last_name);
+            }
+            if (Schema::hasColumn('users', 'first_name')) {
+                $newUser->first_name = $request->first_name;
+            }
+            if (Schema::hasColumn('users', 'last_name')) {
+                $newUser->last_name = $request->last_name;
+            }
 
-        $user->email    = $googleData['email'];
-        $user->password = Hash::make($request->password);
-        $user->role     = $request->role;
+            $newUser->email    = $googleData['email'];
+            $newUser->password = Hash::make($request->password);
+            $newUser->role     = $request->role;
 
-        if (Schema::hasColumn('users', 'avatar_url')) {
-            $user->avatar_url = $avatarUrl;
-        }
-        if (Schema::hasColumn('users', 'avatar')) {
-            $user->avatar = $avatarUrl;
-        }
-        if (Schema::hasColumn('users', 'google_id')) {
-            $user->google_id = $googleData['google_id'];
-        }
-        if (Schema::hasColumn('users', 'email_verified_at')) {
-            $user->email_verified_at = now();
-        }
+            if (Schema::hasColumn('users', 'avatar_url')) {
+                $newUser->avatar_url = $avatarUrl;
+            }
+            if (Schema::hasColumn('users', 'avatar')) {
+                $newUser->avatar = $avatarUrl;
+            }
+            if ($hasGoogleIdCol) {
+                $newUser->google_id = $googleData['google_id'];
+            }
+            if (Schema::hasColumn('users', 'email_verified_at')) {
+                $newUser->email_verified_at = now();
+            }
 
-        $user->save();
+            $newUser->save();
+
+            return $newUser;
+        });
 
         $request->session()->forget('google_signup_data');
         Auth::login($user, true);
@@ -233,8 +255,6 @@ class SocialiteController extends Controller
             } catch (\Throwable $e) {
                 Log::error('Supabase Google signup avatar upload exception: ' . $e->getMessage());
             }
-        } else {
-            Log::warning('Supabase credentials missing during Google signup avatar upload.');
         }
 
         $path = $file->store('avatars', 'public');

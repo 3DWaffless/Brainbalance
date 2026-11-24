@@ -123,7 +123,7 @@
             </div>
 
             <div class="bb-heading">Complete Your Profile</div>
-            <div class="bb-sub">Choose your role and set a password to finish creating your account.</div>
+            <div class="bb-sub">Your account is not created yet—choose your role, set a password, and click below to finish.</div>
 
             @if ($errors->any())
                 <div class="bb-alert error">
@@ -133,7 +133,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('auth.google.complete.store') }}" enctype="multipart/form-data">
+            <form id="google-complete-form" method="POST" action="{{ route('auth.google.complete.store') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="google_payload" value="{{ old('google_payload', $encryptedGoogleData ?? '') }}">
 
@@ -218,7 +218,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="bb-btn">
+                <button type="submit" name="finish_signup" value="1" id="finish-signup-btn" class="bb-btn">
                     🚀 Finish &amp; Enter BrainBalance
                 </button>
             </form>
@@ -243,6 +243,27 @@
             img.style.display = 'block';
             if (fallback) fallback.style.display = 'none';
         }
+
+        const completeForm = document.getElementById('google-complete-form');
+        const finishBtn = document.getElementById('finish-signup-btn');
+        let isSubmitting = false;
+
+        completeForm.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && event.target.tagName === 'INPUT') {
+                event.preventDefault();
+            }
+        });
+
+        completeForm.addEventListener('submit', function (event) {
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+            isSubmitting = true;
+            finishBtn.style.pointerEvents = 'none';
+            finishBtn.style.opacity = '0.85';
+            finishBtn.textContent = 'Creating your account...';
+        });
 
         selectRole(document.getElementById('role-input').value || 'student');
     </script>
