@@ -608,18 +608,8 @@
         <div class="bb-spectrum-strip"></div>
         <div class="bb-hero-inner">
             <div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="bb-hero-pill {{ $isEditing ? 'draft-pill' : '' }}">
-                        <span>
-                            {{ $isEditing ? '📝 Quiz Editor • Draft Mode' : '✨ Quiz Builder • 7 Question Types' }}
-                        </span>
-                    </div>
-                    <div id="autoSaveStatusBadge" class="autosave-badge">
-                        <span id="autoSaveStatusText">🛡️ Auto-draft protection active</span>
-                    </div>
-                </div>
                 <h1 id="heroQuizHeading" class="font-display text-2xl sm:text-3xl font-bold text-[#0D2B4E]">
-                    {{ $isEditing ? 'Edit Quiz: ' . ($editingQuiz->title ?? 'Untitled Draft') : 'Create New Quiz 📝' }}
+                    {{ $isEditing ? 'Edit Quiz: ' . ($editingQuiz->title ?? 'Untitled Draft') : 'Create New Quiz' }}
                 </h1>
                 <p class="text-xs sm:text-sm font-extrabold text-[#4A688A] mt-1">
                     Build from scratch with 7 interactive types, generate questions with Groq AI, reuse from your Question Bank, or save as a draft.
@@ -627,10 +617,10 @@
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 <button type="button" onclick="openAiGenerator()" class="btn-ai-cyan">
-                    <span>🤖 AI Generate Questions</span>
+                    <span>Generate Questions using AI</span>
                 </button>
                 <button type="button" onclick="openQuestionBank()" class="btn-bank-orange">
-                    <span>🏦 Question Bank</span>
+                    <span> Import From Question Bank</span>
                     <span class="px-2.5 py-0.5 rounded-full bg-white text-[#D96B00] text-xs font-black">{{ $bankTotalQuestions }}</span>
                 </button>
                 <a href="{{ route('quiz.index') }}" id="btnBackToQuizzes" onclick="handleExitToQuizzes(event)" class="btn-back-tactile">
@@ -803,7 +793,7 @@
         <div class="p-5 bg-white border-b-2 border-[#C7E0FF]">
             <div class="flex items-center justify-between gap-3">
                 <div>
-                    <div class="text-[11px] font-black uppercase tracking-wider text-[#0066D6]">🤖 Groq AI Lesson Analyzer</div>
+                    <div class="text-[11px] font-black uppercase tracking-wider text-[#0066D6]">Groq AI Lesson Analyzer</div>
                     <h2 class="font-display text-2xl font-bold text-[#0D2B4E]">AI Question Generator</h2>
                 </div>
                 <button type="button" onclick="closeAiGenerator()" class="w-10 h-10 rounded-2xl bg-[#F5FAFF] border-2 border-[#C7E0FF] font-black text-lg text-[#0D2B4E] hover:bg-[#EBF5FF] hover:border-[#0066D6] cursor-pointer">
@@ -1536,17 +1526,17 @@
                 <div>
                     <label class="form-label">Difficulty</label>
                     <select class="form-control q-diff-field">
-                        <option value="easy" ${difficulty === 'easy' ? 'selected' : ''}>🌱 Easy</option>
-                        <option value="medium" ${difficulty === 'medium' ? 'selected' : ''}>⚡ Medium</option>
-                        <option value="hard" ${difficulty === 'hard' ? 'selected' : ''}>🚀 Hard</option>
+                        <option value="easy" ${difficulty === 'easy' ? 'selected' : ''}>Easy</option>
+                        <option value="medium" ${difficulty === 'medium' ? 'selected' : ''}>Medium</option>
+                        <option value="hard" ${difficulty === 'hard' ? 'selected' : ''}>Hard</option>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">XP Stars ⭐</label>
+                    <label class="form-label">XP</label>
                     <input type="number" class="form-control q-points-field" value="${points}" min="10" max="1000" step="10" required>
                 </div>
                 <div>
-                    <label class="form-label">Time Limit ⏱️</label>
+                    <label class="form-label">Time Limit</label>
                     <div class="flex items-center gap-1.5">
                         <input type="number"
                                class="form-control q-time-val-field"
