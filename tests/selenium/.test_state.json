@@ -1,0 +1,10 @@
+{
+  "student_email": "student_1795578368@brainbalance.test",
+  "student_password": "StrongPass!2026",
+  "teacher_email": "teacher@brainbalance.com",
+  "teacher_password": "password",
+  "admin_email": "admin@brainbalance.com",
+  "admin_password": "password",
+  "class_code": "QWERTY",
+  "chromedriver_path": "C:\\Users\\Daniel Diamante\\.wdm\\drivers\\chromedriver\\win64\\158.0.8127.88\\chromedriver-win64/chromedriver.exe"
+}

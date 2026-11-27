@@ -794,27 +794,6 @@
             </div>
         </div>
 
-        {{-- Right Guide Sidebar matching Dashboard Cards --}}
-        <div class="sidebar-card">
-            <div class="bb-spectrum-strip"></div>
-            <div class="sidebar-header">
-                <div class="sidebar-title">💡 7-Type Quiz Guide</div>
-            </div>
-            <div class="sidebar-body">
-                <div class="sidebar-item accent-blue">
-                    🤖 <strong>AI Question Generator:</strong> Upload a lesson file from your computer or pick a published class file, set exact counts per question type, and paste the results straight into your quiz!
-                </div>
-                <div class="sidebar-item accent-orange">
-                    🏦 <strong>Question Bank:</strong> Click <strong>Question Bank</strong> to search and pull questions from any quiz you already published, separated per quiz.
-                </div>
-                <div class="sidebar-item accent-green">
-                    💾 <strong>Auto-Draft Protection:</strong> Your edits stay saved even if you refresh the page, and closing or leaving the editor automatically updates this exact quiz as a <strong>Draft</strong> without creating duplicates.
-                </div>
-                <div class="sidebar-item accent-amber">
-                    ⏱️ <strong>Flexible Timers:</strong> Set each question's timer in <strong>Seconds</strong>, <strong>Minutes</strong>, or <strong>Hours</strong> using the unit dropdown.
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
