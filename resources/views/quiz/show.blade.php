@@ -774,8 +774,7 @@
         <div class="quiz-runner-card" id="quizRunnerCard">
             <div id="quizContainer">
                 <div style="text-align: center; padding: 36px;">
-                    <div style="font-size: 48px; margin-bottom: 12px;">🚀</div>
-                    <div style="font-weight: 900; font-size: 18px; color: #0066D6;">Getting your quest challenges ready...</div>
+                    <div style="font-weight: 900; font-size: 18px; color: #0066D6;">Getting your quiz ready...</div>
                 </div>
             </div>
         </div>

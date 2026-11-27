@@ -209,7 +209,7 @@
             <p class="sub">Answer {{ $quiz->questions->count() }} questions, build up answer streaks, and earn bonus XP stars!</p>
             <div style="margin-top: 1.5rem;">
                 <button class="btn-primary" style="padding: 16px; font-size: 17px;" onclick="startQuiz({{ $quiz->id }})">
-                    🚀 Start Quest Now
+                    🚀 Start Quiz Now
                 </button>
             </div>
         </div>
@@ -274,7 +274,7 @@
     <div class="screen" id="screen-summary">
         <div class="card" id="summary-card" style="text-align:center">
             <div style="font-size:62px;line-height:1">🏆</div>
-            <h1 style="text-align:center; margin-top: 10px;">Quest Completed!</h1>
+            <h1 style="text-align:center; margin-top: 10px;">Quiz Completed!</h1>
             <p class="sub" style="text-align:center">Awesome job, superstar! Here is how you did:</p>
             <div class="stats-grid">
                 <div class="stat-box">

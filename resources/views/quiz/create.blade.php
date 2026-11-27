@@ -640,10 +640,6 @@
         </div>
     </div>
 
-    <div id="restoredDraftNotice" class="notice-banner" style="display: none;">
-        ✨ Your unsaved quiz edits were automatically restored after refresh and synced to this draft.
-    </div>
-
     @if (session('info'))
         <div class="notice-banner">
             ℹ️ {{ session('info') }}
